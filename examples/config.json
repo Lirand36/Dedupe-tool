@@ -1,0 +1,38 @@
+{
+  "policy": {
+    "channels": [
+      {
+        "name": "inbound",
+        "when": [{ "field": "leadSource", "op": "in", "values": ["Web Form", "Webinar"] }]
+      },
+      {
+        "name": "outbound",
+        "when": [{ "field": "leadSource", "op": "in", "values": ["Cold Call", "Outbound"] }]
+      }
+    ],
+    "fields": {
+      "leadSource": { "kind": "origin" },
+      "originalForm": { "kind": "channel", "channel": "inbound", "pick": "earliest" },
+      "utmCampaign": { "kind": "channel", "channel": "inbound", "pick": "earliest" },
+      "sdrOwner": { "kind": "channel", "channel": "outbound", "pick": "latest" },
+      "sequence": { "kind": "channel", "channel": "outbound", "pick": "latest" },
+      "email": { "kind": "current" },
+      "phone": { "kind": "current" },
+      "title": { "kind": "current" },
+      "lifecycleStage": { "kind": "strongest", "ranking": ["Customer", "SQL", "MQL", "Lead"] },
+      "interests": { "kind": "combine" }
+    }
+  },
+  "match": {
+    "entity": "person",
+    "fields": {
+      "email": "email",
+      "firstName": "firstName",
+      "lastName": "lastName",
+      "phone": "phone",
+      "company": "company"
+    },
+    "thresholds": { "auto": 0.95, "review": 0.75 },
+    "defaultCountry": "US"
+  }
+}

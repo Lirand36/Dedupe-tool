@@ -1,0 +1,14 @@
+{
+  "name": "@dedupe/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "dedupe": "./src/main.ts"
+  },
+  "dependencies": {
+    "@dedupe/core": "0.1.0",
+    "csv-parse": "^7.0.3",
+    "csv-stringify": "^6.9.0"
+  }
+}

@@ -1,0 +1,10 @@
+id,createdAt,updatedAt,email,firstName,lastName,phone,company,leadSource,originalForm,utmCampaign,sdrOwner,sequence,title,lifecycleStage,interests
+L-001,2023-03-01,2023-04-01,dana@acme.com,Dana,Levi,,Acme Inc,Web Form,Pricing Demo,q1-brand,,,Marketing Manager,MQL,Analytics
+L-002,2025-02-10,2025-02-20,Dana@Acme.com,Dana,Levi,(415) 555-2671,Acme,Cold Call,,,Sam SDR,Enterprise Q1,VP Marketing,SQL,Integrations; Analytics
+L-003,2024-05-05,2024-05-06,jon@globex.com,Jon,Smith,,Globex,Webinar,AI Webinar,webinar-may,,,Analyst,MQL,
+L-004,2025-01-15,2025-03-01,jsmith@globex.com,Jonathan,Smith,,Globex Corp,Outbound,,,Rita SDR,Mid-Market,Senior Analyst,Lead,
+L-005,2024-02-01,2024-02-01,alex@gmail.com,Alex,Kim,,,Web Form,Newsletter,nl-feb,,,,Lead,
+L-006,2024-08-01,2024-08-01,akim99@gmail.com,Alex,Kim,,,Web Form,Ebook,ebook-aug,,,,Lead,
+L-007,2022-11-11,2023-01-01,priya@initech.com,Priya,Shah,+1 212 555 0199,Initech,Webinar,Security Webinar,sec-webinar,,,Director IT,MQL,Security
+L-008,2024-09-09,2025-04-04,priya.shah@initech.io,Priya,Shah,212-555-0199,Initech,Cold Call,,,Sam SDR,Security Push,VP IT,Customer,Compliance
+L-009,2025-05-05,2025-05-05,max@umbrella.com,Max,Stone,,Umbrella,Partner,,,,,CTO,Lead,

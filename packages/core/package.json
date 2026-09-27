@@ -1,0 +1,13 @@
+{
+  "name": "@dedupe/core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "libphonenumber-js": "^1.13.14",
+    "zod": "^4.6.5"
+  }
+}
