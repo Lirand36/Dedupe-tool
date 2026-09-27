@@ -112,6 +112,16 @@ export function recordsFromCsv(text: string, policy: Policy, system = "csv"): So
   return toSourceRecords(parseCsv(text).rows, policy, system);
 }
 
+const FORMULA_START = /^[=+\-@\t\r]/;
+
+/**
+ * Spreadsheets run cells starting with = + - @ as formulas, so CRM data like
+ * =HYPERLINK("http://evil",…) could execute when the export is opened. A leading ' makes it text.
+ */
+export function safeCell(text: string): string {
+  return FORMULA_START.test(text) ? `'${text}` : text;
+}
+
 export function cellText(value: FieldValue | undefined): string {
   if (value === undefined || value === null) return "";
   return Array.isArray(value) ? value.join(`${LIST_SEPARATOR} `) : String(value);
@@ -141,5 +151,5 @@ export function identitiesToCsv(result: RunResult, policy: Policy): string {
       identity.golden.reasons[f]?.text ?? "",
     ]),
   ]);
-  return stringify([header, ...rows]);
+  return stringify([header, ...rows].map((row) => row.map(safeCell)));
 }

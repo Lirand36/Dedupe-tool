@@ -8,8 +8,9 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { endSession, passwordMatches, requireSession, startSession } from "./auth";
 import { readAuthEnv } from "./env";
+import { UserFacingError } from "./errors";
 import { applyOverrides, type Decision } from "./insights";
-import { createRateLimiter } from "./rateLimit";
+import { clientIp, createRateLimiter } from "./rateLimit";
 import * as repo from "./repo";
 import {
   currentDataset,
@@ -26,22 +27,33 @@ export interface FormState {
 
 const LOGIN_ATTEMPTS = 5;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+/** Caps total attempts too, so rotating addresses cannot buy unlimited password guesses. */
+const GLOBAL_LOGIN_ATTEMPTS = 20;
 const loginLimiter = createRateLimiter(LOGIN_ATTEMPTS, LOGIN_WINDOW_MS);
+const globalLoginLimiter = createRateLimiter(GLOBAL_LOGIN_ATTEMPTS, LOGIN_WINDOW_MS);
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 const MAX_NAME_LENGTH = 100;
 const DECISIONS: readonly Decision[] = ["pending", "merged", "rejected"];
 
+/** Known, admin-readable errors are shown as-is; anything else is logged and kept generic. */
 function friendly(error: unknown): string {
-  if (error instanceof CsvError || error instanceof ConfigError) return error.message;
+  if (
+    error instanceof CsvError ||
+    error instanceof ConfigError ||
+    error instanceof UserFacingError
+  ) {
+    return error.message;
+  }
   console.error(error);
-  return error instanceof Error ? error.message : "Something went wrong. Check the server logs.";
+  return "Something went wrong. Check the server logs.";
 }
 
 export async function loginAction(_: FormState, form: FormData): Promise<FormState> {
   const auth = readAuthEnv();
   if (!auth.ok) return { error: `Login is not configured: ${auth.problems.join("; ")}` };
-  const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
-  if (!loginLimiter.attempt(ip)) return { error: "Too many attempts. Try again in 15 minutes." };
+  const ip = clientIp((await headers()).get("x-forwarded-for"));
+  if (!globalLoginLimiter.attempt("all") || !loginLimiter.attempt(ip))
+    return { error: "Too many attempts. Try again in 15 minutes." };
   if (!passwordMatches(auth.env.adminPassword, String(form.get("password") ?? ""))) {
     return { error: "Wrong password." };
   }
@@ -135,13 +147,13 @@ export async function saveConfigAction(input: unknown): Promise<FormState> {
 async function currentRunId(): Promise<string> {
   const dataset = await currentDataset();
   const run = dataset ? await repo.latestRun(dataset.id) : null;
-  if (!run) throw new Error("No run yet.");
+  if (!run) throw new UserFacingError("No run yet. Click Find duplicates first.");
   return run.id;
 }
 
 export async function decideAction(identityId: string, decision: Decision): Promise<void> {
   await requireSession();
-  if (!DECISIONS.includes(decision)) throw new Error("Unknown decision");
+  if (!DECISIONS.includes(decision)) throw new UserFacingError("Unknown decision");
   await repo.decideIdentity(await currentRunId(), identityId, decision);
   revalidatePath("/", "layout");
 }
@@ -156,7 +168,7 @@ export async function overrideAction(
   const dataset = await currentDataset();
   const config = dataset ? await repo.getConfig(dataset.id) : null;
   const tag = config?.policy.fields[field];
-  if (!tag) throw new Error(`"${field}" is not a tagged field`);
+  if (!tag) throw new UserFacingError(`"${field}" is not a tagged field`);
   const value: FieldValue | null =
     text === null
       ? null

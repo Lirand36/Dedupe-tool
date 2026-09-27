@@ -20,3 +20,12 @@ export function createRateLimiter(maxAttempts: number, windowMs: number): RateLi
     },
   };
 }
+
+/**
+ * The platform proxy appends the real client address to X-Forwarded-For, so the last entry is the
+ * trustworthy one. Earlier entries are whatever the client chose to send.
+ */
+export function clientIp(forwardedFor: string | null): string {
+  const last = forwardedFor?.split(",").at(-1)?.trim();
+  return last ? last : "unknown";
+}

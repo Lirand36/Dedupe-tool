@@ -6,7 +6,7 @@ import {
   isReadyToMerge,
   MINUTES_PER_MANUAL_MERGE,
 } from "../src/lib/insights";
-import { createRateLimiter } from "../src/lib/rateLimit";
+import { clientIp, createRateLimiter } from "../src/lib/rateLimit";
 import { createSessionToken, passwordMatches, verifySessionToken } from "../src/lib/session";
 
 const SECRET = "x".repeat(40);
@@ -29,6 +29,14 @@ describe("sessions", () => {
   it("compares passwords exactly", () => {
     expect(passwordMatches("correct horse", "correct horse")).toBe(true);
     expect(passwordMatches("correct horse", "correct hors")).toBe(false);
+  });
+});
+
+describe("clientIp", () => {
+  it("uses the address the platform proxy appended, not one the client made up", () => {
+    expect(clientIp("1.1.1.1, 2.2.2.2, 9.9.9.9")).toBe("9.9.9.9");
+    expect(clientIp("9.9.9.9")).toBe("9.9.9.9");
+    expect(clientIp(null)).toBe("unknown");
   });
 });
 

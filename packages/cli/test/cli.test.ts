@@ -5,7 +5,7 @@ import type { Policy } from "@dedupe/core";
 import { parse } from "csv-parse/sync";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { runCommand, suggestCommand } from "../src/commands";
-import { CsvError, recordsFromCsv } from "../src/csv";
+import { CsvError, recordsFromCsv, safeCell } from "../src/csv";
 import { suggestConfig } from "../src/suggestConfig";
 
 const EXAMPLES = join(import.meta.dirname, "../../../examples");
@@ -44,6 +44,20 @@ describe("recordsFromCsv", () => {
   ])("rejects bad input with a clear message (%#)", (csv, message) => {
     expect(() => recordsFromCsv(csv, policy)).toThrow(CsvError);
     expect(() => recordsFromCsv(csv, policy)).toThrow(message);
+  });
+});
+
+describe("safeCell", () => {
+  it.each([
+    ['=HYPERLINK("http://evil","x")', `'=HYPERLINK("http://evil","x")`],
+    ["+1 415 555 2671", "'+1 415 555 2671"],
+    ["-5", "'-5"],
+    ["@SUM(A1)", "'@SUM(A1)"],
+    ["\tcmd", "'\tcmd"],
+    ["Dana", "Dana"],
+    ["", ""],
+  ])("neutralises spreadsheet formulas: %j", (input, expected) => {
+    expect(safeCell(input)).toBe(expected);
   });
 });
 

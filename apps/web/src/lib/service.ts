@@ -9,6 +9,7 @@ import {
   runPipeline,
 } from "@dedupe/core";
 import { cookies } from "next/headers";
+import { UserFacingError } from "./errors";
 import {
   carryOverDecisions,
   createRun,
@@ -32,13 +33,19 @@ export async function currentDataset(): Promise<DatasetSummary | null> {
 }
 
 export async function selectDataset(id: string): Promise<void> {
-  (await cookies()).set(DATASET_COOKIE, id, { httpOnly: true, sameSite: "lax", path: "/" });
+  (await cookies()).set(DATASET_COOKIE, id, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+  });
 }
 
 /** Runs matching + survivorship on the stored records and keeps earlier Inbox decisions. */
 export async function runDataset(datasetId: string): Promise<string> {
   const config = await getConfig(datasetId);
-  if (!config) throw new Error("This dataset has no logic yet. Open Logic and save it first.");
+  if (!config)
+    throw new UserFacingError("This dataset has no logic yet. Open Logic and save it first.");
   const previous = await latestRun(datasetId);
   const records = toSourceRecords(await getRecords(datasetId), config.policy);
   const runId = await createRun(datasetId, config, runPipeline(records, config));
