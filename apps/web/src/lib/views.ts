@@ -34,10 +34,21 @@ export function buildComparison(
   policy: Policy,
   golden: Parameters<typeof applyOverrides>[0],
   overrides: Overrides,
+  /** When given, fields without a rule survive from this record (the merge master). */
+  masterId?: string,
 ): ComparisonRow[] {
   const final = applyOverrides(golden, overrides);
   const tagged = fieldColumns.filter((f) => f in policy.fields);
   const untagged = fieldColumns.filter((f) => !(f in policy.fields));
+  const master = records.find((r) => r.id === masterId);
+  const fromMaster = (field: string) =>
+    master
+      ? {
+          text: master.cells[field] ?? "",
+          reason: "Kept from the master record",
+          overridden: false,
+        }
+      : null;
   const row = (field: string, isTagged: boolean): ComparisonRow => {
     const reason = final.reasons[field];
     const cleanText = valueText(final.values[field]);
@@ -46,13 +57,16 @@ export function buildComparison(
       tagged: isTagged,
       cells: records.map((r) => {
         const text = r.cells[field] ?? "";
-        const isWinner =
-          isTagged && (reason?.sourceId === r.id || (cleanText !== "" && text === cleanText));
+        const decided = isTagged || field in overrides;
+        const isWinner = decided
+          ? reason?.sourceId === r.id || (cleanText !== "" && text === cleanText)
+          : r.id === masterId;
         return { recordId: r.id, text, isWinner };
       }),
-      clean: isTagged
-        ? { text: cleanText, reason: reason?.text ?? "", overridden: field in overrides }
-        : null,
+      clean:
+        isTagged || field in overrides
+          ? { text: cleanText, reason: reason?.text ?? "", overridden: field in overrides }
+          : fromMaster(field),
     };
   };
   return [...tagged.map((f) => row(f, true)), ...untagged.map((f) => row(f, false))];

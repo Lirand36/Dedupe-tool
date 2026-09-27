@@ -192,7 +192,7 @@ export async function importPlanFor(
     identities: identities.map((i) => ({
       sourceIds: i.sourceIds,
       golden: applyOverrides(i.golden, i.overrides),
-      ready: isReadyToMerge(i),
+      ready: isReadyToMerge(i) || i.decision === "merged",
     })),
     fields: dataset.fieldColumns,
   });

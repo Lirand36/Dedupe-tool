@@ -94,4 +94,10 @@ export const MIGRATIONS: readonly (readonly string[])[] = [
     "UPDATE events SET dataset_id = NULL WHERE kind IN ('rules', 'example')",
     "CREATE INDEX events_by_object ON events (object_type, created_at DESC)",
   ],
+  [
+    "ALTER TABLE identities ADD COLUMN master_id text",
+    "ALTER TABLE identities ADD COLUMN merged_at timestamptz",
+    "UPDATE identities SET decision = 'approved' WHERE decision = 'merged'",
+    "ALTER TABLE objects ADD COLUMN schedule jsonb",
+  ],
 ];

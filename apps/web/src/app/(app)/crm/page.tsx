@@ -67,13 +67,9 @@ export default async function CrmPage() {
                     )}
                   </div>
                   <div className="mt-auto flex items-center gap-2 pt-4">
-                    <form action={selectDatasetAction}>
-                      <input type="hidden" name="id" value={snapshot.id} />
-                      <input type="hidden" name="next" value="/inbox" />
-                      <button type="submit" className="btn-primary px-3 py-1.5 text-xs">
-                        <Inbox size={14} aria-hidden /> Review
-                      </button>
-                    </form>
+                    <Link href={`/crm/${p.id}`} className="btn-primary px-3 py-1.5 text-xs">
+                      <Inbox size={14} aria-hidden /> Open duplicates
+                    </Link>
                     <form action={selectDatasetAction}>
                       <input type="hidden" name="id" value={snapshot.id} />
                       <input type="hidden" name="next" value="/rules" />

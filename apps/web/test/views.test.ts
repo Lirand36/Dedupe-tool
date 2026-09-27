@@ -38,6 +38,21 @@ describe("buildComparison", () => {
   });
 });
 
+describe("buildComparison with a master record", () => {
+  it("fills fields without a rule from the master, and lets a person pin them", () => {
+    const rows = buildComparison(records, ["notes", "title"], policy, golden, {}, "A");
+    const notes = rows.find((r) => r.field === "notes");
+    expect(notes?.clean).toEqual({
+      text: "x",
+      reason: "Kept from the master record",
+      overridden: false,
+    });
+    expect(notes?.cells.map((c) => c.isWinner)).toEqual([true, false]);
+    const pinned = buildComparison(records, ["notes"], policy, golden, { notes: "new" }, "A")[0];
+    expect(pinned?.clean).toEqual({ text: "new", reason: "Chosen by you", overridden: true });
+  });
+});
+
 describe("groupLabel", () => {
   const record = {
     id: "A",

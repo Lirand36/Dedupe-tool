@@ -1,19 +1,40 @@
-import { ArrowRightLeft, Download, FilePlus2, Inbox, Layers, RefreshCw } from "lucide-react";
+import { ArrowRightLeft, Download, FilePlus2, Layers, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { PageHeader, SectionTitle, StatCard } from "@/components/ui";
-import { selectDatasetAction } from "@/lib/actions";
+import { GroupList } from "@/components/groups/GroupList";
+import { PageHeader, SectionTitle, StatCard, Tabs } from "@/components/ui";
+import { loadGroupPage, STATUS_FILTERS, type StatusFilter } from "@/lib/groupViews";
 import { objectLabel } from "@/lib/objects";
 import { getDataset } from "@/lib/repo";
 import { importPlanFor } from "@/lib/service";
 
-export default async function ImportPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+const FILTER_LABELS: Record<StatusFilter, string> = {
+  all: "All",
+  review: "Needs review",
+  ready: "Ready",
+  merged: "Merged",
+  rejected: "Not duplicates",
+};
+
+export default async function ImportPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ status?: string; page?: string }>;
+}) {
+  const [{ id }, query] = await Promise.all([params, searchParams]);
   const dataset = await getDataset(id);
   if (!dataset) notFound();
   if (dataset.status !== "ready") redirect(`/imports/${id}/map`);
   if (dataset.kind === "crm") redirect("/crm");
-  const { plan, hasCrm } = await importPlanFor(dataset);
+  const status = STATUS_FILTERS.includes(query.status as StatusFilter)
+    ? (query.status as StatusFilter)
+    : "all";
+  const [{ plan, hasCrm }, groups] = await Promise.all([
+    importPlanFor(dataset),
+    loadGroupPage(dataset, { status, query: "", page: Number(query.page) || 1 }),
+  ]);
   const label = objectLabel(dataset.objectType);
   const { stats } = plan;
   const files = [
@@ -47,15 +68,6 @@ export default async function ImportPage({ params }: { params: Promise<{ id: str
         eyebrow={`Import into ${label}`}
         title={dataset.name}
         description={`${stats.fileRows} rows in the file. Rules: ${label}.`}
-        actions={
-          <form action={selectDatasetAction}>
-            <input type="hidden" name="id" value={dataset.id} />
-            <input type="hidden" name="next" value="/inbox" />
-            <button type="submit" className="btn-ghost">
-              <Inbox size={16} aria-hidden /> Review groups
-            </button>
-          </form>
-        }
       />
       {stats.pendingReview > 0 && (
         <div className="card border-amber-200 bg-warn-soft p-4 text-sm">
@@ -124,6 +136,27 @@ export default async function ImportPage({ params }: { params: Promise<{ id: str
             in CRM. This import is re-checked against it automatically.
           </p>
         )}
+      </section>
+      <section id="groups" className="space-y-4">
+        <SectionTitle
+          title="Duplicate groups"
+          description="Rows that match each other or an existing CRM record. Approve uncertain groups to merge them in the files."
+        />
+        <Tabs
+          active={status}
+          items={STATUS_FILTERS.filter((s) => s !== "merged").map((s) => ({
+            key: s,
+            label: FILTER_LABELS[s],
+            href: `/imports/${dataset.id}?status=${s}#groups`,
+            count: groups.counts[s],
+          }))}
+        />
+        <GroupList
+          key={`${status}-${groups.page}`}
+          groups={groups.groups}
+          datasetId={dataset.id}
+          mode="import"
+        />
       </section>
     </div>
   );

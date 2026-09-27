@@ -69,8 +69,10 @@ describe("applyOverrides", () => {
     expect(golden.values.title).toBe("VP");
   });
 
-  it("ignores overrides for fields outside the policy", () => {
-    expect(applyOverrides(golden, { unknown: "x" }).values).toEqual(golden.values);
+  it("can pin fields that have no rule, like notes kept from the master", () => {
+    const result = applyOverrides(golden, { unknown: "x" });
+    expect(result.values).toEqual({ ...golden.values, unknown: "x" });
+    expect(result.reasons.unknown?.text).toBe("Chosen by you");
   });
 });
 
@@ -94,20 +96,22 @@ describe("healthSummary", () => {
     { tier: "auto", decision: "pending", size: 2 },
     { tier: "auto", decision: "rejected", size: 2 },
     { tier: "review", decision: "pending", size: 3 },
-    { tier: "review", decision: "merged", size: 2 },
+    { tier: "review", decision: "approved", size: 2 },
+    { tier: "auto", decision: "merged", size: 3 },
   ] as const;
 
   it("counts what is ready, what waits for a person and the time saved", () => {
     expect(healthSummary(100, groups)).toEqual({
       records: 100,
-      duplicateGroups: 4,
-      duplicateRecords: 9,
-      duplicateRate: 0.09,
+      duplicateGroups: 5,
+      duplicateRecords: 12,
+      duplicateRate: 0.12,
       readyToMerge: 2,
+      merged: 1,
       needsReview: 1,
       rejected: 1,
-      recordsToRemove: 2,
-      hoursSaved: (2 * MINUTES_PER_MANUAL_MERGE) / 60,
+      recordsToRemove: 4,
+      hoursSaved: (3 * MINUTES_PER_MANUAL_MERGE) / 60,
     });
   });
 
@@ -119,6 +123,7 @@ describe("healthSummary", () => {
     expect(isReadyToMerge({ tier: "auto", decision: "pending" })).toBe(true);
     expect(isReadyToMerge({ tier: "auto", decision: "rejected" })).toBe(false);
     expect(isReadyToMerge({ tier: "review", decision: "pending" })).toBe(false);
-    expect(isReadyToMerge({ tier: "review", decision: "merged" })).toBe(true);
+    expect(isReadyToMerge({ tier: "review", decision: "approved" })).toBe(true);
+    expect(isReadyToMerge({ tier: "auto", decision: "merged" })).toBe(false);
   });
 });

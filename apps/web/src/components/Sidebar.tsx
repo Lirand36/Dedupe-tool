@@ -1,6 +1,6 @@
 "use client";
 
-import { Cloud, FileUp, GitMerge, History, Inbox, LayoutDashboard, LogOut } from "lucide-react";
+import { Cloud, FileUp, GitMerge, History, LayoutDashboard, LogOut } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logoutAction } from "@/lib/actions";
@@ -9,7 +9,6 @@ const LINKS = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
   { href: "/crm", label: "CRM", icon: Cloud },
   { href: "/imports", label: "Imports", icon: FileUp },
-  { href: "/inbox", label: "Review", icon: Inbox },
   { href: "/rules", label: "Rules", icon: GitMerge },
   { href: "/history", label: "History", icon: History },
 ] as const;
@@ -44,7 +43,7 @@ export function Sidebar({ needsReview }: { needsReview: number }) {
                 className={active ? "text-indigo-300" : "text-slate-400"}
               />
               <span className="flex-1">{label}</span>
-              {label === "Review" && needsReview > 0 && (
+              {label === "CRM" && needsReview > 0 && (
                 <span className="rounded-full bg-amber-400/20 px-2 py-0.5 text-xs text-amber-300">
                   {needsReview}
                 </span>

@@ -1,7 +1,7 @@
 "use server";
 
 import { CsvError, mapRows, readRows, toSourceRecords } from "@dedupe/cli/csv";
-import { ConfigError, diffConfigs, type FieldValue, getPreset, parseRunConfig } from "@dedupe/core";
+import { ConfigError, diffConfigs, getPreset, parseRunConfig } from "@dedupe/core";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -9,7 +9,7 @@ import { z } from "zod";
 import { endSession, passwordMatches, requireSession, startSession } from "./auth";
 import { readAuthEnv } from "./env";
 import { UserFacingError } from "./errors";
-import { applyOverrides, type Decision } from "./insights";
+import { applyOverrides } from "./insights";
 import { clientIp, createRateLimiter } from "./rateLimit";
 import * as repo from "./repo";
 import {
@@ -36,7 +36,6 @@ const loginLimiter = createRateLimiter(LOGIN_ATTEMPTS, LOGIN_WINDOW_MS);
 const globalLoginLimiter = createRateLimiter(GLOBAL_LOGIN_ATTEMPTS, LOGIN_WINDOW_MS);
 const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 const MAX_NAME_LENGTH = 100;
-const DECISIONS: readonly Decision[] = ["pending", "merged", "rejected"];
 
 /** Known, admin-readable errors are shown as-is; anything else is logged and kept generic. */
 function friendly(error: unknown): string {
@@ -168,7 +167,7 @@ export async function applyMappingAction(datasetId: string, input: unknown): Pro
   redirect(dataset.kind === "crm" ? "/crm" : `/imports/${datasetId}`);
 }
 
-const SAFE_NEXT = /^\/[a-z/-]*$/;
+const SAFE_NEXT = /^\/[a-z0-9/._-]*$/i;
 
 export async function selectDatasetAction(form: FormData): Promise<void> {
   await requireSession();
@@ -236,84 +235,31 @@ export async function saveConfigAction(input: unknown): Promise<FormState> {
   return { message: "Rules are live. Decisions on unchanged groups were kept." };
 }
 
-async function currentRunId(): Promise<string> {
-  const dataset = await currentDataset();
-  const run = dataset ? await repo.latestRun(dataset.id) : null;
-  if (!run) throw new UserFacingError("No run yet. Click Find duplicates first.");
-  return run.id;
-}
-
-export async function decideAction(identityId: string, decision: Decision): Promise<void> {
-  await requireSession();
-  if (!DECISIONS.includes(decision)) throw new UserFacingError("Unknown decision");
-  const runId = await currentRunId();
-  await repo.decideIdentity(runId, identityId, decision);
-  const [dataset, identity] = await Promise.all([
-    currentDataset(),
-    repo.getIdentity(runId, identityId),
-  ]);
-  if (dataset && identity) {
-    const verb = {
-      merged: "Approved merge of",
-      rejected: "Marked not duplicates:",
-      pending: "Reopened",
-    }[decision];
-    await repo.logEvent(
-      { objectType: dataset.objectType, datasetId: dataset.id },
-      "decision",
-      `${verb} ${identity.sourceIds.join(" + ")}`,
-    );
-  }
-  revalidatePath("/", "layout");
-}
-
-/** Pins a field to a value the admin picked from one of the records (null clears the pin). */
-export async function overrideAction(
+export async function saveExampleAction(
+  datasetId: string,
   identityId: string,
-  field: string,
-  text: string | null,
-): Promise<void> {
+  name: string,
+): Promise<FormState> {
   await requireSession();
-  const dataset = await currentDataset();
-  const config = dataset ? await repo.getConfig(dataset.id) : null;
-  const tag = config?.policy.fields[field];
-  if (!tag) throw new UserFacingError(`"${field}" is not a tagged field`);
-  const value: FieldValue | null =
-    text === null
-      ? null
-      : tag.kind === "combine"
-        ? text
-            .split(";")
-            .map((v) => v.trim())
-            .filter(Boolean)
-        : text;
-  await repo.setOverride(await currentRunId(), identityId, field, value);
-  revalidatePath("/inbox");
-}
-
-export async function saveExampleAction(identityId: string, name: string): Promise<FormState> {
-  await requireSession();
-  const dataset = await currentDataset();
-  const runId = await currentRunId();
+  const dataset = await repo.getDataset(datasetId);
+  const run = dataset ? await repo.latestRun(dataset.id) : null;
+  if (!dataset || !run) return { error: "Could not find that group." };
   const [identity, config, raw] = await Promise.all([
-    repo.getIdentity(runId, identityId),
-    dataset ? repo.getConfig(dataset.id) : null,
-    dataset ? datasetRecords(dataset) : [],
+    repo.getIdentity(run.id, identityId),
+    repo.getConfig(dataset.id),
+    datasetRecords(dataset),
   ]);
-  if (!dataset || !identity || !config) return { error: "Could not find that group." };
+  if (!identity || !config) return { error: "Could not find that group." };
   const members = raw.filter((r) => identity.sourceIds.includes(r.id));
+  const label = name.trim().slice(0, MAX_NAME_LENGTH) || `Group ${identity.keepRecordId}`;
   await repo.createExample(dataset.objectType, {
-    name: name.trim().slice(0, MAX_NAME_LENGTH) || `Group ${identity.keepRecordId}`,
+    name: label,
     records: toSourceRecords(members, config.policy),
     expected: { ...applyOverrides(identity.golden, identity.overrides).values },
   });
-  await repo.logEvent(
-    { objectType: dataset.objectType },
-    "example",
-    `Saved example "${name.trim() || identity.keepRecordId}"`,
-  );
+  await repo.logEvent({ objectType: dataset.objectType }, "example", `Saved example "${label}"`);
   revalidatePath("/rules");
-  return { message: "Saved as an example. Logic changes that break it will be flagged." };
+  return { message: "Saved as an example. Rule changes that break it will be flagged." };
 }
 
 export async function deleteExampleAction(form: FormData): Promise<void> {

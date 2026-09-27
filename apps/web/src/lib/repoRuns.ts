@@ -68,6 +68,9 @@ export interface IdentityRow {
   readonly evidence: readonly Evidence[];
   readonly decision: Decision;
   readonly overrides: Overrides;
+  /** The record that survives the merge. Defaults to the one the engine keeps. */
+  readonly masterId: string;
+  readonly mergedAt: Date | null;
 }
 
 type IdentityDbRow = {
@@ -81,6 +84,8 @@ type IdentityDbRow = {
   evidence: Evidence[];
   decision: Decision;
   overrides: Overrides;
+  master_id: string | null;
+  merged_at: Date | null;
 };
 
 const toIdentity = (r: IdentityDbRow): IdentityRow => ({
@@ -94,6 +99,8 @@ const toIdentity = (r: IdentityDbRow): IdentityRow => ({
   evidence: r.evidence,
   decision: r.decision,
   overrides: r.overrides,
+  masterId: r.master_id ?? r.keep_record_id,
+  mergedAt: r.merged_at ? new Date(r.merged_at) : null,
 });
 
 export async function listIdentities(runId: string): Promise<IdentityRow[]> {
@@ -136,9 +143,31 @@ export async function setOverride(
 /** Keeps Inbox decisions when a re-run produces the exact same duplicate group. */
 export async function carryOverDecisions(fromRunId: string, toRunId: string): Promise<void> {
   await (await getDb()).query(
-    `UPDATE identities n SET decision = o.decision, overrides = o.overrides, decided_at = o.decided_at
+    `UPDATE identities n SET decision = o.decision, overrides = o.overrides, decided_at = o.decided_at,
+       master_id = o.master_id, merged_at = o.merged_at
      FROM identities o
      WHERE n.run_id = $2 AND o.run_id = $1 AND n.source_ids = o.source_ids`,
     [fromRunId, toRunId],
+  );
+}
+
+/** Applies one decision to many groups of a run. Merging stamps the time it happened. */
+export async function decideIdentities(
+  runId: string,
+  ids: readonly string[],
+  decision: Decision,
+): Promise<void> {
+  await (await getDb()).query(
+    `UPDATE identities SET decision = $3, decided_at = now(),
+       merged_at = CASE WHEN $3 = 'merged' THEN now() ELSE NULL END
+     WHERE run_id = $1 AND id = ANY($2::text[])`,
+    [runId, ids, decision],
+  );
+}
+
+export async function setMaster(runId: string, id: string, recordId: string): Promise<void> {
+  await (await getDb()).query(
+    "UPDATE identities SET master_id = $3 WHERE run_id = $1 AND id = $2 AND source_ids ? $3",
+    [runId, id, recordId],
   );
 }

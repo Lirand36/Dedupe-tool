@@ -2,6 +2,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import type { FieldValue, RunConfig, SourceRecord } from "@dedupe/core";
 import { getDb } from "./db";
+import type { MergeSchedule } from "./groups";
 import { json } from "./repoUtil";
 
 /** An object (e.g. Salesforce Contacts) owns its rules; CRM data and imports into it share them. */
@@ -10,14 +11,22 @@ export interface ObjectRow {
   readonly config: RunConfig;
   /** Every field seen on this object so far (standard and custom). */
   readonly fields: readonly string[];
+  readonly schedule: MergeSchedule | null;
   readonly updatedAt: Date;
 }
 
-type ObjectDbRow = { object_type: string; config: RunConfig; fields: string[]; updated_at: Date };
+type ObjectDbRow = {
+  object_type: string;
+  config: RunConfig;
+  fields: string[];
+  schedule: MergeSchedule | null;
+  updated_at: Date;
+};
 const toObject = (r: ObjectDbRow): ObjectRow => ({
   objectType: r.object_type,
   config: r.config,
   fields: r.fields,
+  schedule: r.schedule,
   updatedAt: new Date(r.updated_at),
 });
 
@@ -134,4 +143,11 @@ export async function countEvents(objectType: string): Promise<Record<EventKind,
   );
   const counts = { upload: 0, run: 0, rules: 0, decision: 0, example: 0, export: 0 };
   return { ...counts, ...Object.fromEntries(rows.map((r) => [r.kind, Number(r.n)])) };
+}
+
+export async function saveSchedule(objectType: string, schedule: MergeSchedule): Promise<void> {
+  await (await getDb()).query("UPDATE objects SET schedule = $2::jsonb WHERE object_type = $1", [
+    objectType,
+    json(schedule),
+  ]);
 }
