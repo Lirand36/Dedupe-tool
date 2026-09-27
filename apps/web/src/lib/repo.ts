@@ -27,6 +27,7 @@ export interface DatasetSummary {
   readonly id: string;
   readonly name: string;
   readonly entity: "person" | "company";
+  readonly objectType: string;
   readonly fieldColumns: readonly string[];
   readonly recordCount: number;
   readonly createdAt: Date;
@@ -36,6 +37,7 @@ type DatasetRow = {
   id: string;
   name: string;
   entity: "person" | "company";
+  object_type: string;
   field_columns: string[];
   record_count: number;
   created_at: Date;
@@ -45,6 +47,7 @@ const toDataset = (r: DatasetRow): DatasetSummary => ({
   id: r.id,
   name: r.name,
   entity: r.entity,
+  objectType: r.object_type,
   fieldColumns: r.field_columns,
   recordCount: r.record_count,
   createdAt: new Date(r.created_at),
@@ -53,6 +56,7 @@ const toDataset = (r: DatasetRow): DatasetSummary => ({
 export async function createDataset(input: {
   name: string;
   entity: "person" | "company";
+  objectType: string;
   fieldColumns: readonly string[];
   rows: readonly RawRecord[];
   config: RunConfig;
@@ -60,8 +64,9 @@ export async function createDataset(input: {
   const db = await getDb();
   const id = randomUUID();
   await db.query(
-    "INSERT INTO datasets (id, name, entity, field_columns, record_count) VALUES ($1, $2, $3, $4::jsonb, $5)",
-    [id, input.name, input.entity, json(input.fieldColumns), input.rows.length],
+    `INSERT INTO datasets (id, name, entity, object_type, field_columns, record_count)
+     VALUES ($1, $2, $3, $4, $5::jsonb, $6)`,
+    [id, input.name, input.entity, input.objectType, json(input.fieldColumns), input.rows.length],
   );
   for (const chunk of chunks(input.rows, INSERT_CHUNK)) {
     await db.query(
@@ -290,4 +295,110 @@ export async function carryOverDecisions(fromRunId: string, toRunId: string): Pr
      WHERE n.run_id = $2 AND o.run_id = $1 AND n.source_ids = o.source_ids`,
     [fromRunId, toRunId],
   );
+}
+
+export type EventKind = "upload" | "run" | "rules" | "decision" | "example" | "export";
+
+export interface EventRow {
+  readonly id: string;
+  readonly kind: EventKind;
+  readonly summary: string;
+  readonly detail: Readonly<Record<string, unknown>>;
+  readonly createdAt: Date;
+}
+
+/** Appends to the history log. Never updated or deleted except with the dataset. */
+export async function logEvent(
+  datasetId: string,
+  kind: EventKind,
+  summary: string,
+  detail: Record<string, unknown> = {},
+): Promise<void> {
+  await (await getDb()).query(
+    "INSERT INTO events (id, dataset_id, kind, summary, detail) VALUES ($1, $2, $3, $4, $5::jsonb)",
+    [randomUUID(), datasetId, kind, summary, json(detail)],
+  );
+}
+
+export async function listEvents(datasetId: string, limit = 200): Promise<EventRow[]> {
+  const rows = await (await getDb()).query<{
+    id: string;
+    kind: EventKind;
+    summary: string;
+    detail: Record<string, unknown>;
+    created_at: Date;
+  }>("SELECT * FROM events WHERE dataset_id = $1 ORDER BY created_at DESC LIMIT $2", [
+    datasetId,
+    limit,
+  ]);
+  return rows.map((r) => ({ ...r, createdAt: new Date(r.created_at) }));
+}
+
+export async function countEvents(datasetId: string): Promise<Record<EventKind, number>> {
+  const rows = await (await getDb()).query<{ kind: EventKind; n: string | number }>(
+    "SELECT kind, count(*) AS n FROM events WHERE dataset_id = $1 GROUP BY kind",
+    [datasetId],
+  );
+  const counts = { upload: 0, run: 0, rules: 0, decision: 0, example: 0, export: 0 };
+  return { ...counts, ...Object.fromEntries(rows.map((r) => [r.kind, Number(r.n)])) };
+}
+
+const MAX_SAMPLE_VALUES = 50;
+
+/** Distinct non-empty values per column, used to build channels and stage rankings from real data. */
+export async function sampleValues(datasetId: string): Promise<Record<string, string[]>> {
+  const rows = await (await getDb()).query<{ key: string; vals: string[] }>(
+    `SELECT e.key, (array_agg(DISTINCT e.value))[1:${MAX_SAMPLE_VALUES}] AS vals
+     FROM dataset_records r, jsonb_each_text(r.cells) e
+     WHERE r.dataset_id = $1 AND e.value <> ''
+     GROUP BY e.key`,
+    [datasetId],
+  );
+  return Object.fromEntries(rows.map((r) => [r.key, r.vals]));
+}
+
+/** Records whose id or any cell contains the query (case-insensitive). */
+export async function searchRecords(
+  datasetId: string,
+  query: string,
+  limit = 20,
+): Promise<RawRecord[]> {
+  const rows = await (await getDb()).query<{
+    id: string;
+    created_at: string;
+    updated_at: string;
+    cells: Record<string, string>;
+  }>(
+    `SELECT id, created_at, updated_at, cells FROM dataset_records
+     WHERE dataset_id = $1 AND (id ILIKE $2 OR cells::text ILIKE $2)
+     ORDER BY id LIMIT $3`,
+    [datasetId, `%${query.replace(/[%_\\]/g, "\\$&")}%`, limit],
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+    cells: r.cells,
+  }));
+}
+
+export async function getRecordsByIds(
+  datasetId: string,
+  ids: readonly string[],
+): Promise<RawRecord[]> {
+  const rows = await (await getDb()).query<{
+    id: string;
+    created_at: string;
+    updated_at: string;
+    cells: Record<string, string>;
+  }>(
+    "SELECT id, created_at, updated_at, cells FROM dataset_records WHERE dataset_id = $1 AND id = ANY($2::text[])",
+    [datasetId, ids],
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
+    cells: r.cells,
+  }));
 }

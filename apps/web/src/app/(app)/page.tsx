@@ -1,130 +1,187 @@
+import {
+  CheckCircle2,
+  Circle,
+  Clock,
+  Download,
+  Layers,
+  Percent,
+  Sparkles,
+  Timer,
+} from "lucide-react";
 import Link from "next/link";
 import { EmptyState } from "@/components/EmptyState";
-import { Stat } from "@/components/Stat";
+import { EventIcon } from "@/components/EventIcon";
+import { PageHeader, SectionTitle, StatCard } from "@/components/ui";
 import { fillRates, healthSummary, MINUTES_PER_MANUAL_MERGE } from "@/lib/insights";
-import { getRecords, latestRun, listIdentities, listRuns } from "@/lib/repo";
+import { objectLabel } from "@/lib/objects";
+import { countEvents, getRecords, latestRun, listEvents, listIdentities } from "@/lib/repo";
 import { currentDataset } from "@/lib/service";
 
-const FILL_RATES_SHOWN = 8;
+const FILL_RATES_SHOWN = 6;
+const RECENT_EVENTS = 6;
 const pct = (n: number) => `${(n * 100).toFixed(n > 0 && n < 0.1 ? 1 : 0)}%`;
 
-export default async function HealthPage() {
+export default async function OverviewPage() {
   const dataset = await currentDataset();
   if (!dataset) {
     return (
       <EmptyState
-        title="Start with a CSV export"
-        body="Upload people or companies from your CRM. Nothing is ever written back to the CRM from here."
-        href="/data"
-        cta="Upload a dataset"
+        title="Welcome to Dedupe"
+        body="Start by adding the object you want to clean: Salesforce Leads, Contacts or Accounts, HubSpot Contacts or Companies, or any CSV."
+        href="/objects"
+        cta="Add your first object"
       />
     );
   }
-  const [run, runs, records] = await Promise.all([
+  const [run, records, counts, events] = await Promise.all([
     latestRun(dataset.id),
-    listRuns(dataset.id),
     getRecords(dataset.id),
+    countEvents(dataset.id),
+    listEvents(dataset.id, RECENT_EVENTS),
   ]);
   const identities = run ? await listIdentities(run.id) : [];
   const health = healthSummary(
     dataset.recordCount,
     identities.map((i) => ({ tier: i.tier, decision: i.decision, size: i.sourceIds.length })),
   );
-  const rates = fillRates(records, dataset.fieldColumns).slice(0, FILL_RATES_SHOWN);
+  const steps = [
+    { label: "Add an object", done: true, href: "/objects" },
+    { label: "Review and publish your rules", done: counts.rules > 0, href: "/rules/setup" },
+    {
+      label: "Clear the review queue",
+      done: run !== null && health.needsReview === 0,
+      href: "/inbox",
+    },
+    { label: "Download the clean data", done: counts.export > 0, href: "/api/export" },
+  ];
+  const nextStep = steps.find((s) => !s.done);
 
   return (
     <div className="mx-auto max-w-6xl space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">Health</h1>
-          <p className="text-sm text-muted">How clean this dataset is and what's left to do.</p>
-        </div>
-        {health.readyToMerge > 0 && (
-          <a href="/api/export" className="btn-ghost">
-            Download clean CSV ({health.readyToMerge} groups)
-          </a>
-        )}
-      </div>
+      <PageHeader
+        eyebrow={`${objectLabel(dataset.objectType)} · ${dataset.name}`}
+        title="Overview"
+        description="How clean this object is and what's left to do."
+        actions={
+          health.readyToMerge > 0 && (
+            <a href="/api/export" className="btn-ghost">
+              <Download size={16} aria-hidden /> Download clean CSV
+            </a>
+          )
+        }
+      />
 
-      {health.needsReview > 0 && (
-        <Link
-          href="/inbox"
-          className="card flex items-center justify-between border-amber-200 bg-warn-soft p-4"
-        >
-          <span className="text-sm">
-            <strong>{health.needsReview}</strong> duplicate group
-            {health.needsReview === 1 ? " needs" : "s need"} a quick look. Everything else was
-            handled automatically.
-          </span>
-          <span className="text-sm font-medium text-warn">Open Inbox →</span>
-        </Link>
+      {nextStep && (
+        <section className="card overflow-hidden">
+          <div className="flex items-center gap-2 border-b border-line bg-gradient-to-r from-indigo-50 to-white px-6 py-4">
+            <Sparkles size={18} className="text-accent" aria-hidden />
+            <h2 className="font-semibold">Get set up</h2>
+            <span className="ml-auto text-sm text-muted">
+              {steps.filter((s) => s.done).length} of {steps.length} done
+            </span>
+          </div>
+          <ol className="grid gap-px bg-line sm:grid-cols-4">
+            {steps.map((s, i) => (
+              <li key={s.label} className="bg-white">
+                <Link href={s.href} className="flex h-full items-start gap-3 p-5 hover:bg-slate-50">
+                  {s.done ? (
+                    <CheckCircle2 size={20} className="shrink-0 text-good" aria-hidden />
+                  ) : (
+                    <Circle
+                      size={20}
+                      className={`shrink-0 ${s === nextStep ? "text-accent" : "text-slate-300"}`}
+                      aria-hidden
+                    />
+                  )}
+                  <span className="text-sm">
+                    <span className="block text-xs text-muted">Step {i + 1}</span>
+                    <span className={s.done ? "text-muted line-through" : "font-medium"}>
+                      {s.label}
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ol>
+        </section>
       )}
 
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard
+          icon={Percent}
           label="Duplicate rate"
           value={pct(health.duplicateRate)}
           hint={`${health.duplicateRecords} of ${health.records.toLocaleString()} records`}
+          tone="violet"
         />
-        <Stat
+        <StatCard
+          icon={Layers}
           label="Ready to merge"
           value={String(health.readyToMerge)}
           hint={`${health.recordsToRemove} records to remove`}
-          tone="good"
+          tone="emerald"
         />
-        <Stat
+        <StatCard
+          icon={Clock}
           label="Needs review"
           value={String(health.needsReview)}
-          tone={health.needsReview > 0 ? "warn" : undefined}
+          hint={health.needsReview > 0 ? "Open Review to decide" : "All caught up"}
+          tone="amber"
         />
-        <Stat
+        <StatCard
+          icon={Timer}
           label="Time saved"
           value={`${health.hoursSaved.toFixed(1)} h`}
           hint={`est. ${MINUTES_PER_MANUAL_MERGE} min per manual merge`}
+          tone="sky"
         />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <section className="card p-5">
-          <h2 className="font-semibold">Emptiest fields</h2>
-          <p className="mb-4 text-sm text-muted">Share of records with a value.</p>
+        <section className="card p-6">
+          <SectionTitle title="Emptiest fields" description="Share of records with a value." />
           <ul className="space-y-3">
-            {rates.map((r) => (
-              <li key={r.column}>
-                <div className="mb-1 flex justify-between text-sm">
-                  <span className="truncate">{r.column}</span>
-                  <span className="tabular-nums text-muted">{pct(r.rate)}</span>
-                </div>
-                <div className="h-1.5 rounded-full bg-slate-100">
-                  <div className="h-1.5 rounded-full bg-accent" style={{ width: pct(r.rate) }} />
+            {fillRates(records, dataset.fieldColumns)
+              .slice(0, FILL_RATES_SHOWN)
+              .map((r) => (
+                <li key={r.column}>
+                  <div className="mb-1 flex justify-between text-sm">
+                    <span className="truncate">{r.column}</span>
+                    <span className="tabular-nums text-muted">{pct(r.rate)}</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-slate-100">
+                    <div
+                      className="h-2 rounded-full bg-gradient-to-r from-indigo-500 to-violet-500"
+                      style={{ width: pct(r.rate) }}
+                    />
+                  </div>
+                </li>
+              ))}
+          </ul>
+        </section>
+        <section className="card p-6">
+          <div className="flex items-start justify-between">
+            <SectionTitle title="Recent activity" />
+            <Link href="/history" className="text-sm text-accent hover:underline">
+              View all
+            </Link>
+          </div>
+          {events.length === 0 && (
+            <p className="text-sm text-muted">
+              Uploads, runs, rule changes and decisions will show up here.
+            </p>
+          )}
+          <ol className="space-y-4">
+            {events.map((e) => (
+              <li key={e.id} className="flex items-center gap-3">
+                <EventIcon kind={e.kind} />
+                <div className="min-w-0">
+                  <div className="truncate text-sm">{e.summary}</div>
+                  <div className="text-xs text-muted">{e.createdAt.toLocaleString()}</div>
                 </div>
               </li>
             ))}
-          </ul>
-        </section>
-        <section className="card p-5">
-          <h2 className="font-semibold">Recent runs</h2>
-          <p className="mb-4 text-sm text-muted">Every save in Logic re-runs automatically.</p>
-          <table className="w-full text-sm">
-            <thead className="text-left text-xs uppercase tracking-wide text-muted">
-              <tr>
-                <th className="pb-2 font-medium">When</th>
-                <th className="pb-2 text-right font-medium">Groups</th>
-                <th className="pb-2 text-right font-medium">Auto</th>
-                <th className="pb-2 text-right font-medium">Review</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {runs.map((r) => (
-                <tr key={r.id}>
-                  <td className="py-2">{r.createdAt.toLocaleString()}</td>
-                  <td className="py-2 text-right tabular-nums">{r.stats.duplicateGroups}</td>
-                  <td className="py-2 text-right tabular-nums">{r.stats.autoGroups}</td>
-                  <td className="py-2 text-right tabular-nums">{r.stats.reviewGroups}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          </ol>
         </section>
       </div>
     </div>

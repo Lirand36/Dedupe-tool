@@ -5,7 +5,7 @@
   --color-ink: #0f172a;
   --color-muted: #64748b;
   --color-line: #e2e8f0;
-  --color-canvas: #f8fafc;
+  --color-canvas: #f5f6fa;
   --color-accent: #4f46e5;
   --color-accent-soft: #eef2ff;
   --color-good: #059669;
@@ -22,7 +22,7 @@ body {
 }
 
 @utility card {
-  @apply rounded-xl border border-line bg-white;
+  @apply rounded-xl border border-line bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)];
 }
 @utility btn {
   @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50;

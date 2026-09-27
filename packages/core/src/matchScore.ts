@@ -40,22 +40,34 @@ export interface PairScore {
   readonly reason: string;
 }
 
-const SAME_EMAIL = 1;
+/** Scores each signal produces, exported so the plain-language summary never drifts from the code. */
+export const SIGNAL_SCORES = {
+  sameEmail: 1,
+  sameEmailDifferentName: 0.8,
+  samePhoneSimilarName: 0.85,
+  similarNameSameCompany: 0.9,
+  sameDomain: 0.95,
+  sameCompanyName: 0.9,
+  companyPhoneConfirmed: 0.9,
+  similarCompanyName: 0.8,
+} as const;
+
+const SAME_EMAIL = SIGNAL_SCORES.sameEmail;
 /** Below any sensible auto threshold: colleagues often share a switchboard number. */
-const SAME_PHONE_SIMILAR_NAME = 0.85;
+const SAME_PHONE_SIMILAR_NAME = SIGNAL_SCORES.samePhoneSimilarName;
 /** Same email but clearly different names: a shared inbox or a reassigned address. */
-const SAME_EMAIL_DIFFERENT_NAME = 0.8;
+const SAME_EMAIL_DIFFERENT_NAME = SIGNAL_SCORES.sameEmailDifferentName;
 const MAX_CONFLICTING_NAME_SIMILARITY = 0.6;
-const SAME_ORG_NAME_WEIGHT = 0.9;
+const SAME_ORG_NAME_WEIGHT = SIGNAL_SCORES.similarNameSameCompany;
 const SIMILAR_ORG_NAME_WEIGHT = 0.8;
 const MIN_PERSON_NAME_SIMILARITY = 0.85;
 /** "Jon" vs "Jonathan": a first name that starts the other one is a strong but not perfect signal. */
 const FIRST_NAME_PREFIX_SIMILARITY = 0.9;
 const MIN_PREFIX_LENGTH = 2;
 const MIN_SIMILAR_ORG = 0.92;
-const SAME_DOMAIN = 0.95;
-const SAME_COMPANY_NAME = 0.9;
-const COMPANY_PHONE_CONFIRMED = 0.9;
+const SAME_DOMAIN = SIGNAL_SCORES.sameDomain;
+const SAME_COMPANY_NAME = SIGNAL_SCORES.sameCompanyName;
+const COMPANY_PHONE_CONFIRMED = SIGNAL_SCORES.companyPhoneConfirmed;
 const MIN_PHONE_CONFIRMED_NAME = 0.8;
 const MIN_COMPANY_NAME_SIMILARITY = 0.9;
 const SIMILAR_COMPANY_NAME_WEIGHT = 0.8;

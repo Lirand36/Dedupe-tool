@@ -1,8 +1,14 @@
 "use server";
 
 import { CsvError, parseCsv, toSourceRecords } from "@dedupe/cli/csv";
-import { suggestConfig } from "@dedupe/cli/suggest";
-import { ConfigError, type FieldValue, parseRunConfig } from "@dedupe/core";
+import {
+  ConfigError,
+  diffConfigs,
+  draftConfig,
+  type FieldValue,
+  getPreset,
+  parseRunConfig,
+} from "@dedupe/core";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -70,26 +76,34 @@ export async function logoutAction(): Promise<void> {
 export async function uploadDatasetAction(_: FormState, form: FormData): Promise<FormState> {
   await requireSession();
   const name = String(form.get("name") ?? "").trim();
-  const entity = form.get("entity") === "company" ? "company" : "person";
+  const preset = getPreset(String(form.get("objectType") ?? ""));
   const file = form.get("file");
+  if (!preset) return { error: "Choose which object this file holds." };
   if (!name || name.length > MAX_NAME_LENGTH)
-    return { error: "Give the dataset a name (up to 100 characters)." };
+    return { error: "Give the object a name (up to 100 characters)." };
   if (!(file instanceof File) || file.size === 0) return { error: "Choose a CSV file." };
   if (file.size > MAX_UPLOAD_BYTES) return { error: "The file is larger than 25 MB." };
-  let datasetId: string;
   try {
     const parsed = parseCsv(await file.text());
-    const { config } = suggestConfig(
-      ["id", "createdAt", "updatedAt", ...parsed.fieldColumns],
-      entity,
+    const { config } = draftConfig(parsed.fieldColumns, preset.id);
+    const datasetId = await repo.createDataset({
+      name,
+      entity: preset.entity,
+      objectType: preset.id,
+      ...parsed,
+      config,
+    });
+    await repo.logEvent(
+      datasetId,
+      "upload",
+      `Uploaded ${parsed.rows.length} ${preset.systemLabel} ${preset.objectLabel} from ${file.name}`,
     );
-    datasetId = await repo.createDataset({ name, entity, ...parsed, config });
     await selectDataset(datasetId);
     await runDataset(datasetId);
   } catch (error) {
     return { error: friendly(error) };
   }
-  redirect("/logic?welcome=1");
+  redirect("/rules/setup?welcome=1");
 }
 
 export async function selectDatasetAction(form: FormData): Promise<void> {
@@ -114,7 +128,7 @@ export async function runAction(): Promise<FormState> {
     return { error: friendly(error) };
   }
   revalidatePath("/", "layout");
-  return { message: "Done. The Inbox is up to date." };
+  return { message: "Done. Review is up to date." };
 }
 
 export async function previewConfigAction(
@@ -135,13 +149,25 @@ export async function saveConfigAction(input: unknown): Promise<FormState> {
   const dataset = await currentDataset();
   if (!dataset) return { error: "Upload a dataset first." };
   try {
-    await repo.saveConfig(dataset.id, parseRunConfig(input));
+    const next = parseRunConfig(input);
+    const [previous, counts] = await Promise.all([
+      repo.getConfig(dataset.id),
+      repo.countEvents(dataset.id),
+    ]);
+    const changes = previous ? diffConfigs(previous, next) : [];
+    await repo.saveConfig(dataset.id, next);
+    await repo.logEvent(
+      dataset.id,
+      "rules",
+      `Rules v${counts.rules + 1} went live${changes.length ? ` with ${changes.length} change(s)` : ""}`,
+      { changes, config: next },
+    );
     await runDataset(dataset.id);
   } catch (error) {
     return { error: friendly(error) };
   }
   revalidatePath("/", "layout");
-  return { message: "Saved and re-ran. Decisions on unchanged groups were kept." };
+  return { message: "Rules are live. Decisions on unchanged groups were kept." };
 }
 
 async function currentRunId(): Promise<string> {
@@ -154,7 +180,20 @@ async function currentRunId(): Promise<string> {
 export async function decideAction(identityId: string, decision: Decision): Promise<void> {
   await requireSession();
   if (!DECISIONS.includes(decision)) throw new UserFacingError("Unknown decision");
-  await repo.decideIdentity(await currentRunId(), identityId, decision);
+  const runId = await currentRunId();
+  await repo.decideIdentity(runId, identityId, decision);
+  const [dataset, identity] = await Promise.all([
+    currentDataset(),
+    repo.getIdentity(runId, identityId),
+  ]);
+  if (dataset && identity) {
+    const verb = {
+      merged: "Approved merge of",
+      rejected: "Marked not duplicates:",
+      pending: "Reopened",
+    }[decision];
+    await repo.logEvent(dataset.id, "decision", `${verb} ${identity.sourceIds.join(" + ")}`);
+  }
   revalidatePath("/", "layout");
 }
 
@@ -198,12 +237,17 @@ export async function saveExampleAction(identityId: string, name: string): Promi
     records: toSourceRecords(members, config.policy),
     expected: { ...applyOverrides(identity.golden, identity.overrides).values },
   });
-  revalidatePath("/logic");
+  await repo.logEvent(
+    dataset.id,
+    "example",
+    `Saved example "${name.trim() || identity.keepRecordId}"`,
+  );
+  revalidatePath("/rules");
   return { message: "Saved as an example. Logic changes that break it will be flagged." };
 }
 
 export async function deleteExampleAction(form: FormData): Promise<void> {
   await requireSession();
   await repo.deleteExample(String(form.get("id") ?? ""));
-  revalidatePath("/logic");
+  revalidatePath("/rules");
 }

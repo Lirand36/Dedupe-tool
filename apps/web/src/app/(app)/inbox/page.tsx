@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { EmptyState } from "@/components/EmptyState";
 import { InboxDetail } from "@/components/InboxDetail";
+import { PageHeader } from "@/components/ui";
 import type { IdentityRow } from "@/lib/repo";
 import { getConfig, getRecords, latestRun, listIdentities } from "@/lib/repo";
 import { currentDataset } from "@/lib/service";
@@ -57,12 +58,10 @@ export default async function InboxPage({
 
   return (
     <div className="mx-auto max-w-7xl space-y-4">
-      <div>
-        <h1 className="text-2xl font-semibold">Inbox</h1>
-        <p className="text-sm text-muted">
-          Only the groups that need a person. Click any value to use it instead.
-        </p>
-      </div>
+      <PageHeader
+        title="Review"
+        description="Only the groups that need a person. Click any value to use it instead."
+      />
       <div className="flex gap-1 border-b border-line">
         {(Object.keys(VIEWS) as View[]).map((v) => (
           <Link

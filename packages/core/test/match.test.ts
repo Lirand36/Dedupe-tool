@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findDuplicates, type MatchConfig } from "../src/match";
+import { findDuplicates, type MatchConfig, scoreAllPairs } from "../src/match";
 import { makeRecord } from "./fixtures";
 
 const T = "2024-01-01T00:00:00Z";
@@ -205,5 +205,24 @@ describe("findDuplicates: companies", () => {
       companyConfig,
     );
     expect(groups).toEqual([]);
+  });
+});
+
+describe("scoreAllPairs", () => {
+  it("explains every pair, including the ones that do not match", () => {
+    const pairs = scoreAllPairs(
+      [
+        person("a", { email: "dana@acme.com", firstName: "Dana", lastName: "Levi" }),
+        person("b", { email: "dana@acme.com", firstName: "Dana", lastName: "Levi" }),
+        person("c", { email: "zed@other.com", firstName: "Zed", lastName: "Other" }),
+      ],
+      personConfig,
+    );
+    expect(pairs.map((p) => `${p.a}-${p.b}:${p.verdict}`)).toEqual([
+      "a-b:auto",
+      "a-c:none",
+      "b-c:none",
+    ]);
+    expect(pairs[0]?.reason).toMatch(/same email/i);
   });
 });

@@ -133,3 +133,35 @@ export function findDuplicates(
   });
   return cluster(edges, config.thresholds);
 }
+
+/** The sandbox compares every pair, so keep it to a handful of records. */
+export const MAX_PAIRWISE_RECORDS = 10;
+
+export interface PairExplanation extends Evidence {
+  readonly verdict: "auto" | "review" | "none";
+}
+
+/** Scores every pair of a few records, including pairs that would not match, with the reason. */
+export function scoreAllPairs(
+  records: readonly SourceRecord[],
+  config: MatchConfig,
+): PairExplanation[] {
+  if (records.length > MAX_PAIRWISE_RECORDS) {
+    throw new Error(`Compare at most ${MAX_PAIRWISE_RECORDS} records at a time`);
+  }
+  const profiles = records.map((r) =>
+    buildProfile(r, config.entity, config.fields, config.defaultCountry),
+  );
+  return profiles.flatMap((a, i) =>
+    profiles.slice(i + 1).map((b) => {
+      const { score, reason } = scorePair(a, b, config.entity);
+      const verdict =
+        score >= config.thresholds.auto
+          ? "auto"
+          : score >= config.thresholds.review
+            ? "review"
+            : "none";
+      return { a: a.id, b: b.id, score, reason, verdict } as const;
+    }),
+  );
+}

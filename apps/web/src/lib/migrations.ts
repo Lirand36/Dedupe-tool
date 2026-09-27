@@ -54,4 +54,17 @@ export const MIGRATIONS: readonly (readonly string[])[] = [
       created_at timestamptz NOT NULL DEFAULT now()
     )`,
   ],
+  [
+    "ALTER TABLE datasets ADD COLUMN object_type text NOT NULL DEFAULT 'other.person'",
+    "UPDATE datasets SET object_type = 'other.company' WHERE entity = 'company'",
+    `CREATE TABLE events (
+      id text PRIMARY KEY,
+      dataset_id text NOT NULL REFERENCES datasets(id) ON DELETE CASCADE,
+      kind text NOT NULL,
+      summary text NOT NULL,
+      detail jsonb NOT NULL DEFAULT '{}',
+      created_at timestamptz NOT NULL DEFAULT now()
+    )`,
+    "CREATE INDEX events_by_dataset ON events (dataset_id, created_at DESC)",
+  ],
 ];

@@ -1,7 +1,7 @@
 import { identitiesToCsv } from "@dedupe/cli/csv";
 import { hasSession } from "@/lib/auth";
 import { applyOverrides, isReadyToMerge } from "@/lib/insights";
-import { latestRun, listIdentities } from "@/lib/repo";
+import { latestRun, listIdentities, logEvent } from "@/lib/repo";
 import { currentDataset } from "@/lib/service";
 
 export const dynamic = "force-dynamic";
@@ -16,6 +16,7 @@ export async function GET(): Promise<Response> {
     .filter(isReadyToMerge)
     .map((i) => ({ ...i, golden: applyOverrides(i.golden, i.overrides) }));
   const csv = identitiesToCsv({ identities, stats: run.stats }, run.config.policy);
+  await logEvent(dataset.id, "export", `Downloaded clean CSV with ${identities.length} groups`);
   const filename = `${dataset.name.replace(/[^\w-]+/g, "_")}-clean.csv`;
   return new Response(csv, {
     headers: {

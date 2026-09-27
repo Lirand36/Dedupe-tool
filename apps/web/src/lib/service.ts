@@ -21,6 +21,7 @@ import {
   listDatasets,
   listExamples,
   listIdentities,
+  logEvent,
 } from "./repo";
 
 export const DATASET_COOKIE = "dedupe_dataset";
@@ -48,8 +49,16 @@ export async function runDataset(datasetId: string): Promise<string> {
     throw new UserFacingError("This dataset has no logic yet. Open Logic and save it first.");
   const previous = await latestRun(datasetId);
   const records = toSourceRecords(await getRecords(datasetId), config.policy);
-  const runId = await createRun(datasetId, config, runPipeline(records, config));
+  const result = runPipeline(records, config);
+  const runId = await createRun(datasetId, config, result);
   if (previous) await carryOverDecisions(previous.id, runId);
+  const { duplicateGroups, autoGroups, reviewGroups } = result.stats;
+  await logEvent(
+    datasetId,
+    "run",
+    `Found ${duplicateGroups} duplicate groups: ${autoGroups} automatic, ${reviewGroups} for review`,
+    { stats: result.stats },
+  );
   return runId;
 }
 
