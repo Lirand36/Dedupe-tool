@@ -30,6 +30,7 @@ function fieldCandidates(
   channel: string | null,
 ): FieldCandidates {
   const stamp = record.fieldTimestamps?.[field];
+  if (stamp !== undefined) assertTimestamp(record.id, field, stamp);
   const earliest: Slot = { value, at: stamp ?? record.createdAt, sourceId: record.id };
   const latest: Slot = { value, at: stamp ?? record.updatedAt, sourceId: record.id };
   return {
@@ -40,8 +41,17 @@ function fieldCandidates(
   };
 }
 
+/** An unreadable date would silently win every "earliest" comparison, so fail loudly instead. */
+function assertTimestamp(recordId: string, label: string, value: string): void {
+  if (Number.isNaN(Date.parse(value))) {
+    throw new Error(`Record ${recordId}: invalid timestamp for ${label} ("${value}")`);
+  }
+}
+
 /** Summarises one record into the candidate slots the policy needs. Empty values are skipped. */
 export function candidatesFromRecord(record: SourceRecord, policy: Policy): Candidates {
+  assertTimestamp(record.id, "createdAt", record.createdAt);
+  assertTimestamp(record.id, "updatedAt", record.updatedAt);
   const channel = classifyChannel(record, policy.channels);
   const fields = Object.entries(policy.fields).flatMap(([field, tag]) => {
     const value = record.fields[field];

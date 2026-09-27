@@ -35,7 +35,8 @@ describe("recordsFromCsv", () => {
   it.each([
     ["id,title\nA,x\n", /Missing required column\(s\): createdAt, updatedAt/],
     ["id,createdAt,updatedAt\n,2024-01-01,2024-01-01\n", /Row 2: "id" is empty/],
-    ["id,createdAt,updatedAt\nA,yesterday,2024-01-01\n", /Row 2: "createdAt" must be a date/],
+    ["id,createdAt,updatedAt\nA,yesterday,2024-01-01\n", /Row 2: "createdAt" must be an ISO date/],
+    ["id,createdAt,updatedAt\nA,03/04/2023,2024-01-01\n", /Row 2: "createdAt" must be an ISO date/],
     [
       "id,createdAt,updatedAt\nA,2024-01-01,2024-01-01\nA,2024-01-01,2024-01-01\n",
       /Row 3: duplicate id "A"/,
@@ -82,8 +83,8 @@ describe("dedupe run on the example data", () => {
     expect(stats).toEqual({
       records: 9,
       duplicateGroups: 3,
-      autoGroups: 2,
-      reviewGroups: 1,
+      autoGroups: 1,
+      reviewGroups: 2,
       recordsToRemove: 3,
     });
 
@@ -105,7 +106,7 @@ describe("dedupe run on the example data", () => {
 
     const priya = rows.find((r) => r.keep_record_id === "L-007");
     expect(priya).toMatchObject({
-      tier: "auto",
+      tier: "review",
       lifecycleStage: "Customer",
       originalForm: "Security Webinar",
     });

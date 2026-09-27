@@ -74,8 +74,18 @@ function compareEvidence(x: Evidence, y: Evidence): number {
   return y.score - x.score || x.a.localeCompare(y.a) || x.b.localeCompare(y.b);
 }
 
-/** Joins strongest links first, so each group's confidence is its weakest necessary link. */
-function cluster(edges: readonly Evidence[], auto: number): DuplicateGroup[] {
+function withinGroup(ids: ReadonlySet<string>, edges: readonly Evidence[]): Evidence[] {
+  return edges.filter((e) => ids.has(e.a) && ids.has(e.b));
+}
+
+/**
+ * Joins strongest links first. A group's confidence is its weakest necessary link, lowered further
+ * by any pair inside the group that was compared and did not match (a conflict).
+ */
+function cluster(
+  edges: readonly Evidence[],
+  thresholds: MatchConfig["thresholds"],
+): DuplicateGroup[] {
   const parent = new Map<string, string>();
   const find = (id: string): string => {
     const p = parent.get(id) ?? id;
@@ -85,7 +95,8 @@ function cluster(edges: readonly Evidence[], auto: number): DuplicateGroup[] {
     return root;
   };
   const links: Evidence[] = [];
-  for (const edge of [...edges].sort(compareEvidence)) {
+  const matches = edges.filter((e) => e.score >= thresholds.review).sort(compareEvidence);
+  for (const edge of matches) {
     const [ra, rb] = [find(edge.a), find(edge.b)];
     if (ra === rb) continue;
     parent.set(ra < rb ? rb : ra, ra < rb ? ra : rb);
@@ -93,11 +104,16 @@ function cluster(edges: readonly Evidence[], auto: number): DuplicateGroup[] {
   }
   const byRoot = new Map<string, Evidence[]>();
   for (const link of links) byRoot.set(find(link.a), [...(byRoot.get(find(link.a)) ?? []), link]);
+  const conflictsAll = edges
+    .filter((e) => e.score < thresholds.review)
+    .map((e) => ({ ...e, reason: `Conflict: ${e.reason}` }));
   return [...byRoot.values()]
-    .map((evidence) => {
-      const ids = [...new Set(evidence.flatMap((e) => [e.a, e.b]))].sort();
+    .map((groupLinks) => {
+      const ids = [...new Set(groupLinks.flatMap((e) => [e.a, e.b]))].sort();
+      const evidence = [...groupLinks, ...withinGroup(new Set(ids), conflictsAll)];
       const confidence = Math.round(Math.min(...evidence.map((e) => e.score)) * 1000) / 1000;
-      return { ids, confidence, tier: confidence >= auto ? "auto" : "review", evidence } as const;
+      const tier = confidence >= thresholds.auto ? "auto" : "review";
+      return { ids, confidence, tier, evidence } as const;
     })
     .sort((x, y) => (x.ids[0] ?? "").localeCompare(y.ids[0] ?? ""));
 }
@@ -112,9 +128,8 @@ export function findDuplicates(
   const edges = candidatePairs(profiles, config.entity).flatMap(([i, j]) => {
     const [a, b] = [profiles[i] as Profile, profiles[j] as Profile];
     const { score, reason } = scorePair(a, b, config.entity);
-    if (score < config.thresholds.review) return [];
     const [first, second] = a.id < b.id ? [a.id, b.id] : [b.id, a.id];
     return [{ a: first, b: second, score, reason }];
   });
-  return cluster(edges, config.thresholds.auto);
+  return cluster(edges, config.thresholds);
 }

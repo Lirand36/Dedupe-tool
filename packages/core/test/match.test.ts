@@ -64,7 +64,7 @@ describe("findDuplicates: people", () => {
     expect(groups).toEqual([]);
   });
 
-  it("auto-merges the same phone with a similar name", () => {
+  it("sends the same phone with a similar name to review, never auto", () => {
     const groups = findDuplicates(
       [
         person("a", { phone: "(415) 555-2671", firstName: "Dana", lastName: "Levi" }),
@@ -72,7 +72,59 @@ describe("findDuplicates: people", () => {
       ],
       personConfig,
     );
-    expect(groups[0]?.tier).toBe("auto");
+    expect(groups[0]?.tier).toBe("review");
+  });
+
+  it("does not auto-merge colleagues who share a switchboard number", () => {
+    const groups = findDuplicates(
+      [
+        person("a", {
+          phone: "+1 415 555 2671",
+          firstName: "Michael",
+          lastName: "Johnson",
+          company: "Acme",
+        }),
+        person("b", {
+          phone: "+1 415 555 2671",
+          firstName: "Michael",
+          lastName: "Johnston",
+          company: "Acme",
+        }),
+      ],
+      personConfig,
+    );
+    expect(groups.every((g) => g.tier === "review")).toBe(true);
+  });
+
+  it("downgrades a chained group when two members contradict each other", () => {
+    const groups = findDuplicates(
+      [
+        person("a", {
+          email: "sam@acme.com",
+          firstName: "Sam",
+          lastName: "Cohen",
+          phone: "+1 415 555 2671",
+        }),
+        person("b", { email: "sam@acme.com", firstName: "Sam", lastName: "Cohen" }),
+        person("c", {
+          email: "sam.c@acme.com",
+          firstName: "Samantha",
+          lastName: "Cohen",
+          phone: "+1 415 555 2671",
+        }),
+        person("d", {
+          email: "sam@acme.com",
+          firstName: "Rita",
+          lastName: "Gold",
+          phone: "+1 415 555 2671",
+        }),
+      ],
+      { ...personConfig, thresholds: { auto: 0.8, review: 0.75 } },
+    );
+    expect(groups).toHaveLength(1);
+    expect(groups[0]?.tier).toBe("review");
+    expect(groups[0]?.confidence).toBeLessThan(0.75);
+    expect(groups[0]?.evidence.some((e) => /conflict/i.test(e.reason))).toBe(true);
   });
 
   it("chains matches into one group and reports the weakest link", () => {

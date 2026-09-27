@@ -136,3 +136,14 @@ describe("resolveGolden edge cases", () => {
     expect(golden.reasons.phone?.text).toMatch(/no value/i);
   });
 });
+
+describe("timestamp validation", () => {
+  it("rejects records with unreadable timestamps instead of treating them as oldest", () => {
+    const bad = { ...inboundLead, fieldTimestamps: { title: "not-a-date" } };
+    expect(() => candidatesFromRecord(bad, revopsPolicy)).toThrow(
+      /lead-inbound.*title.*not-a-date/,
+    );
+    const badCreated = { ...inboundLead, createdAt: "whenever" };
+    expect(() => candidatesFromRecord(badCreated, revopsPolicy)).toThrow(/createdAt/);
+  });
+});

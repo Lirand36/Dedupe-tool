@@ -41,7 +41,11 @@ export interface PairScore {
 }
 
 const SAME_EMAIL = 1;
-const SAME_PHONE_SIMILAR_NAME = 0.96;
+/** Below any sensible auto threshold: colleagues often share a switchboard number. */
+const SAME_PHONE_SIMILAR_NAME = 0.85;
+/** Same email but clearly different names: a shared inbox or a reassigned address. */
+const SAME_EMAIL_DIFFERENT_NAME = 0.8;
+const MAX_CONFLICTING_NAME_SIMILARITY = 0.6;
 const SAME_ORG_NAME_WEIGHT = 0.9;
 const SIMILAR_ORG_NAME_WEIGHT = 0.8;
 const MIN_PERSON_NAME_SIMILARITY = 0.85;
@@ -128,8 +132,13 @@ function personNameSimilarity(a: Profile, b: Profile): number {
 }
 
 function scorePeople(a: Profile, b: Profile): PairScore {
-  if (a.email && a.email === b.email) return { score: SAME_EMAIL, reason: "Same email" };
   const nameSim = personNameSimilarity(a, b);
+  if (a.email && a.email === b.email) {
+    const namesConflict = a.name && b.name && nameSim < MAX_CONFLICTING_NAME_SIMILARITY;
+    return namesConflict
+      ? { score: SAME_EMAIL_DIFFERENT_NAME, reason: "Same email but different names" }
+      : { score: SAME_EMAIL, reason: "Same email" };
+  }
   if (nameSim < MIN_PERSON_NAME_SIMILARITY) return NO_MATCH;
   if (a.phone && a.phone === b.phone) {
     return { score: SAME_PHONE_SIMILAR_NAME, reason: "Same phone, similar name" };

@@ -39,9 +39,14 @@ function cellValue(raw: string, isList: boolean): FieldValue {
     .filter((v) => v !== "");
 }
 
+/** ISO 8601 only: "03/04/2023" means March 4 or April 3 depending on who exported it. */
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?$/;
+
 function checkDate(value: string | undefined, column: string, line: number): string {
-  if (!value || Number.isNaN(Date.parse(value))) {
-    throw new CsvError(`Row ${line}: "${column}" must be a date (got "${value ?? ""}")`);
+  if (!value || !ISO_DATE.test(value) || Number.isNaN(Date.parse(value))) {
+    throw new CsvError(
+      `Row ${line}: "${column}" must be an ISO date like 2024-03-01 or 2024-03-01T10:00:00Z (got "${value ?? ""}")`,
+    );
   }
   return value;
 }
