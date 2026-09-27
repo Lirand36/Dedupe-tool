@@ -3,8 +3,8 @@ import { EmptyState } from "@/components/EmptyState";
 import { InboxDetail } from "@/components/InboxDetail";
 import { PageHeader } from "@/components/ui";
 import type { IdentityRow } from "@/lib/repo";
-import { getConfig, getRecords, latestRun, listIdentities } from "@/lib/repo";
-import { currentDataset } from "@/lib/service";
+import { getConfig, latestRun, listIdentities } from "@/lib/repo";
+import { currentDataset, datasetRecords } from "@/lib/service";
 import { buildComparison, groupLabel } from "@/lib/views";
 
 const VIEWS = {
@@ -40,7 +40,7 @@ export default async function InboxPage({
   }
   const [identities, records, config] = await Promise.all([
     listIdentities(run.id),
-    getRecords(dataset.id),
+    datasetRecords(dataset),
     getConfig(dataset.id),
   ]);
   const byId = new Map(records.map((r) => [r.id, r]));

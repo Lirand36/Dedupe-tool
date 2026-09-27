@@ -1,0 +1,25 @@
+id,createdAt,updatedAt,FirstName,LastName,Email,Phone,AccountName,LeadSource,Original_Form__c,UTM_Campaign__c,SDR_Owner__c,Sequence__c,Title,Lifecycle_Stage__c,Product_Interests__c
+0031001,2023-03-01,2023-04-01,Dana,Levi,dana.levi@acme.com,,Acme Inc,Web Form,Pricing Demo,q1-brand,,,Marketing Manager,MQL,Analytics
+0031002,2025-02-10,2025-02-20,Dana,Levi,Dana.Levi@ACME.com,+1 415 555 2671,Acme,Cold Call,,,Sam Rivera,Enterprise Q1,VP Marketing,SQL,Integrations; Analytics
+0031003,2022-06-14,2022-06-20,Maria,Garcia,maria.garcia@globex.com,,Globex,Webinar,AI in RevOps Webinar,webinar-jun22,,,Ops Analyst,Lead,Automation
+0031004,2024-01-09,2024-01-15,Maria,Garcia,maria.garcia@globex.com,+1 312 555 0148,Globex Corporation,Web Form,Free Trial,trial-jan24,,,RevOps Manager,MQL,Automation; Reporting
+0031005,2025-04-02,2025-05-11,Maria,Garcia,MARIA.GARCIA@globex.com,+1 312 555 0148,Globex,Outbound,,,Rita Chen,Mid-Market Q2,Director of RevOps,Customer,Reporting
+0031006,2024-05-05,2024-05-06,Jon,Smith,jon@initech.com,,Initech,Webinar,Security Webinar,sec-webinar,,,Analyst,MQL,
+0031007,2025-01-15,2025-03-01,Jonathan,Smith,jsmith@initech.com,,Initech,Outbound,,,Rita Chen,Mid-Market Q1,Senior Analyst,Lead,
+0031008,2022-11-11,2023-01-01,Priya,Shah,priya@umbrella.com,+1 212 555 0199,Umbrella,Webinar,Data Quality Webinar,dq-webinar,,,Director IT,MQL,Security
+0031009,2024-09-09,2025-04-04,Priya,Shah,priya.shah@umbrella.io,212-555-0199,Umbrella,Cold Call,,,Sam Rivera,Security Push,VP IT,Customer,Compliance
+0031010,2023-07-07,2023-07-08,Michael,Johnson,michael.johnson@stark.com,+1 646 555 0100,Stark Industries,Web Form,Contact Us,contact-page,,,Procurement Lead,Lead,
+0031011,2024-02-02,2024-02-03,Michael,Johnston,m.johnston@stark.com,+1 646 555 0100,Stark Industries,Cold Call,,,Sam Rivera,Enterprise Q1,Head of Finance,Lead,
+0031012,2024-03-03,2024-03-04,Bruce,Wayne,info@wayne-ent.com,,Wayne Enterprises,Web Form,Newsletter,nl-mar24,,,CEO,Lead,
+0031013,2024-08-08,2024-08-09,Lucius,Fox,info@wayne-ent.com,,Wayne Enterprises,Outbound,,,Rita Chen,Enterprise Q3,CTO,Lead,
+0031014,2024-02-01,2024-02-01,Alex,Kim,alex.kim@gmail.com,,,Web Form,Newsletter,nl-feb24,,,,Lead,
+0031015,2024-08-01,2024-08-01,Alex,Kim,akim1990@gmail.com,,,Web Form,Ebook,ebook-aug24,,,,Lead,
+0031016,2023-05-20,2023-05-21,José,Álvarez,jose.alvarez@hooli.com,,Hooli,Partner,,,,,Engineering Manager,MQL,Integrations
+0031017,2025-06-01,2025-06-02,Jose,Alvarez,Jose.Alvarez@hooli.com,+34 91 555 0123,Hooli,Cold Call,,,Sam Rivera,EMEA Q2,Director of Engineering,SQL,API
+0031018,2023-09-09,2023-09-10,Tom,Baker,tom.baker@initrode.com,,Initrode,Webinar,Pipeline Webinar,pipe-webinar,,,Sales Ops,MQL,Forecasting
+0031019,2025-03-03,2025-03-04,Tom,Baker, Tom.Baker@Initrode.com ,,Initrode,Web Form,Pricing Demo,q1-brand,,,Head of Sales Ops,SQL,Forecasting; Territories
+0031020,2025-05-05,2025-05-05,Max,Stone,max@soylent.com,,Soylent,Partner,,,,,CTO,Lead,
+0031021,2024-10-10,2024-10-11,Ana,Petrova,ana.petrova@vandelay.com,+1 917 555 0177,Vandelay Industries,Web Form,Free Trial,trial-oct24,,,COO,MQL,Automation
+0031022,2023-12-12,2023-12-12,Liam,O'Brien,liam.obrien@massive.co,,Massive Dynamic,Outbound,,,Rita Chen,Enterprise Q4,VP Sales,Lead,
+0031023,2025-07-07,2025-07-08,Noa,Cohen,noa@pied-piper.com,,Pied Piper,Webinar,AI in RevOps Webinar,webinar-jul25,,,Founder,SQL,Compression
+0031024,2025-08-18,2025-08-19,Noa,Cohen,noa.cohen@pied-piper.com,+972 3 555 0110,Pied Piper,Cold Call,,,Sam Rivera,Startups Q3,CEO,Opportunity,Compression; Analytics

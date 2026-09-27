@@ -4,7 +4,7 @@ import type { Suggestion } from "@/components/logicParts";
 import { RulesWizard } from "@/components/rules/RulesWizard";
 import { PageHeader } from "@/components/ui";
 import { objectLabel } from "@/lib/objects";
-import { getConfig } from "@/lib/repo";
+import { getObject } from "@/lib/repo";
 import { currentDataset } from "@/lib/service";
 import { STEPS, type StepKey } from "@/lib/steps";
 
@@ -25,12 +25,14 @@ export default async function RulesSetupPage({
       />
     );
   }
-  const config = await getConfig(dataset.id);
+  const object = await getObject(dataset.objectType);
+  const config = object?.config;
+  const columns = object?.fields ?? dataset.fieldColumns;
   if (!config)
     return (
       <EmptyState title="No rules yet" body="Re-add the object to generate a starting point." />
     );
-  const { suggestions: drafted } = draftConfig(dataset.fieldColumns, dataset.objectType);
+  const { suggestions: drafted } = draftConfig(columns, dataset.objectType);
   const suggestions: Record<string, Suggestion> = Object.fromEntries(
     Object.entries(drafted).map(([field, s]) => [
       field,
@@ -57,7 +59,7 @@ export default async function RulesSetupPage({
       <RulesWizard
         initialStep={step}
         initial={config}
-        columns={dataset.fieldColumns}
+        columns={columns}
         suggestions={suggestions}
         templates={RULE_TEMPLATES}
         object={{

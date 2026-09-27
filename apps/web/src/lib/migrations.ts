@@ -67,4 +67,31 @@ export const MIGRATIONS: readonly (readonly string[])[] = [
     )`,
     "CREATE INDEX events_by_dataset ON events (dataset_id, created_at DESC)",
   ],
+  [
+    `CREATE TABLE objects (
+      object_type text PRIMARY KEY,
+      config jsonb NOT NULL,
+      fields jsonb NOT NULL DEFAULT '[]',
+      created_at timestamptz NOT NULL DEFAULT now(),
+      updated_at timestamptz NOT NULL DEFAULT now()
+    )`,
+    `INSERT INTO objects (object_type, config, fields)
+     SELECT DISTINCT ON (d.object_type) d.object_type, c.config, d.field_columns
+     FROM datasets d JOIN configs c ON c.dataset_id = d.id
+     ORDER BY d.object_type, c.updated_at DESC`,
+    "ALTER TABLE datasets ADD COLUMN kind text NOT NULL DEFAULT 'crm'",
+    "ALTER TABLE datasets ADD COLUMN status text NOT NULL DEFAULT 'ready'",
+    "ALTER TABLE datasets ADD COLUMN headers jsonb NOT NULL DEFAULT '[]'",
+    "ALTER TABLE datasets ADD COLUMN column_map jsonb",
+    "UPDATE datasets SET headers = field_columns",
+    "ALTER TABLE examples ADD COLUMN object_type text",
+    "UPDATE examples e SET object_type = d.object_type FROM datasets d WHERE e.dataset_id = d.id",
+    "ALTER TABLE examples ALTER COLUMN dataset_id DROP NOT NULL",
+    "UPDATE examples SET dataset_id = NULL",
+    "ALTER TABLE events ADD COLUMN object_type text",
+    "UPDATE events e SET object_type = d.object_type FROM datasets d WHERE e.dataset_id = d.id",
+    "ALTER TABLE events ALTER COLUMN dataset_id DROP NOT NULL",
+    "UPDATE events SET dataset_id = NULL WHERE kind IN ('rules', 'example')",
+    "CREATE INDEX events_by_object ON events (object_type, created_at DESC)",
+  ],
 ];

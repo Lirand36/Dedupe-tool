@@ -12,6 +12,8 @@ export interface ObjectPreset {
   readonly systemLabel: string;
   readonly objectLabel: string;
   readonly entity: Entity;
+  /** API names of the object's standard fields, used as mapping targets for imports. */
+  readonly standardFields: readonly string[];
   /** Keyed by normalizeFieldName(apiName). */
   readonly fieldTags: Readonly<Record<string, FieldTag>>;
 }
@@ -89,6 +91,21 @@ export const OBJECT_PRESETS: readonly ObjectPreset[] = [
     systemLabel: "Salesforce",
     objectLabel: "Leads",
     entity: "person",
+    standardFields: [
+      "FirstName",
+      "LastName",
+      "Email",
+      "Phone",
+      "MobilePhone",
+      "Company",
+      "Title",
+      "Website",
+      "LeadSource",
+      "Status",
+      "Industry",
+      "Country",
+      "OwnerId",
+    ],
     fieldTags: {
       ...SF_PERSON,
       status: strongest(SF_LEAD_STATUS),
@@ -102,6 +119,18 @@ export const OBJECT_PRESETS: readonly ObjectPreset[] = [
     systemLabel: "Salesforce",
     objectLabel: "Contacts",
     entity: "person",
+    standardFields: [
+      "FirstName",
+      "LastName",
+      "Email",
+      "Phone",
+      "MobilePhone",
+      "AccountName",
+      "Title",
+      "LeadSource",
+      "MailingCountry",
+      "OwnerId",
+    ],
     fieldTags: SF_PERSON,
   },
   {
@@ -110,6 +139,18 @@ export const OBJECT_PRESETS: readonly ObjectPreset[] = [
     systemLabel: "Salesforce",
     objectLabel: "Accounts",
     entity: "company",
+    standardFields: [
+      "Name",
+      "Website",
+      "Phone",
+      "Industry",
+      "Type",
+      "AccountSource",
+      "NumberOfEmployees",
+      "AnnualRevenue",
+      "BillingCountry",
+      "OwnerId",
+    ],
     fieldTags: {
       type: strongest(["Customer", "Partner", "Prospect"]),
       accountsource: origin,
@@ -127,6 +168,21 @@ export const OBJECT_PRESETS: readonly ObjectPreset[] = [
     systemLabel: "HubSpot",
     objectLabel: "Contacts",
     entity: "person",
+    standardFields: [
+      "firstname",
+      "lastname",
+      "email",
+      "phone",
+      "mobilephone",
+      "company",
+      "jobtitle",
+      "website",
+      "country",
+      "lifecyclestage",
+      "hs_lead_status",
+      "hs_analytics_source",
+      "hubspot_owner_id",
+    ],
     fieldTags: HS_PERSON,
   },
   {
@@ -135,6 +191,17 @@ export const OBJECT_PRESETS: readonly ObjectPreset[] = [
     systemLabel: "HubSpot",
     objectLabel: "Companies",
     entity: "company",
+    standardFields: [
+      "name",
+      "domain",
+      "phone",
+      "industry",
+      "country",
+      "lifecyclestage",
+      "numberofemployees",
+      "annualrevenue",
+      "hubspot_owner_id",
+    ],
     fieldTags: {
       lifecyclestage: strongest(HS_LIFECYCLE),
       hsanalyticssource: origin,
@@ -152,6 +219,7 @@ export const OBJECT_PRESETS: readonly ObjectPreset[] = [
     systemLabel: "Other",
     objectLabel: "People",
     entity: "person",
+    standardFields: [],
     fieldTags: {},
   },
   {
@@ -160,6 +228,7 @@ export const OBJECT_PRESETS: readonly ObjectPreset[] = [
     systemLabel: "Other",
     objectLabel: "Companies",
     entity: "company",
+    standardFields: [],
     fieldTags: {},
   },
 ];

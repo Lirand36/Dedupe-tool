@@ -31,7 +31,9 @@ export default async function HistoryPage({
       />
     );
   const active = FILTERS.find((f) => f.key === filter) ?? FILTERS[0];
-  const events = (await listEvents(dataset.id)).filter((e) => active?.kinds.includes(e.kind));
+  const events = (await listEvents(dataset.objectType)).filter((e) =>
+    active?.kinds.includes(e.kind),
+  );
   const byDay = new Map<string, EventRow[]>();
   for (const e of events) {
     const day = e.createdAt.toDateString();

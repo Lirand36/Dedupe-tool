@@ -28,31 +28,32 @@ export default async function OverviewPage() {
       <EmptyState
         title="Welcome to Dedupe"
         body="Start by adding the object you want to clean: Salesforce Leads, Contacts or Accounts, HubSpot Contacts or Companies, or any CSV."
-        href="/objects"
-        cta="Add your first object"
+        href="/crm"
+        cta="Get started"
       />
     );
   }
   const [run, records, counts, events] = await Promise.all([
     latestRun(dataset.id),
     getRecords(dataset.id),
-    countEvents(dataset.id),
-    listEvents(dataset.id, RECENT_EVENTS),
+    countEvents(dataset.objectType),
+    listEvents(dataset.objectType, RECENT_EVENTS),
   ]);
   const identities = run ? await listIdentities(run.id) : [];
   const health = healthSummary(
     dataset.recordCount,
     identities.map((i) => ({ tier: i.tier, decision: i.decision, size: i.sourceIds.length })),
   );
+  const downloadHref = dataset.kind === "import" ? `/imports/${dataset.id}` : "/api/export";
   const steps = [
-    { label: "Add an object", done: true, href: "/objects" },
+    { label: "Add CRM data or an import", done: true, href: "/crm" },
     { label: "Review and publish your rules", done: counts.rules > 0, href: "/rules/setup" },
     {
       label: "Clear the review queue",
       done: run !== null && health.needsReview === 0,
       href: "/inbox",
     },
-    { label: "Download the clean data", done: counts.export > 0, href: "/api/export" },
+    { label: "Download the clean data", done: counts.export > 0, href: downloadHref },
   ];
   const nextStep = steps.find((s) => !s.done);
 
@@ -64,7 +65,7 @@ export default async function OverviewPage() {
         description="How clean this object is and what's left to do."
         actions={
           health.readyToMerge > 0 && (
-            <a href="/api/export" className="btn-ghost">
+            <a href={downloadHref} className="btn-ghost">
               <Download size={16} aria-hidden /> Download clean CSV
             </a>
           )

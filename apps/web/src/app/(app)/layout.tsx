@@ -18,12 +18,17 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     0,
     identities.map((i) => ({ tier: i.tier, decision: i.decision, size: i.sourceIds.length })),
   );
-  const options = datasets.map((d) => ({
-    id: d.id,
-    name: d.name,
-    system: objectSystem(d.objectType),
-    label: objectLabel(d.objectType),
-  }));
+  const options = datasets
+    .filter((d) => d.status === "ready")
+    .map((d) => ({
+      id: d.id,
+      name: d.name,
+      system: objectSystem(d.objectType),
+      label:
+        d.kind === "crm"
+          ? `${objectLabel(d.objectType)} · CRM`
+          : `Import → ${objectLabel(d.objectType)}`,
+    }));
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row">

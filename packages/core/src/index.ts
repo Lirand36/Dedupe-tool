@@ -9,6 +9,8 @@ export {
   previewPolicyChange,
 } from "./examples";
 export { goldenFromRecords } from "./golden";
+export { type ImportPlan, type ImportRow, planImport } from "./importPlan";
+export { type ColumnMap, objectFields, suggestColumnMap } from "./mapping";
 export {
   type DuplicateGroup,
   type Evidence,

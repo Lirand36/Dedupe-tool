@@ -1,17 +1,11 @@
 "use server";
 
-import { CsvError, parseCsv, toSourceRecords } from "@dedupe/cli/csv";
-import {
-  ConfigError,
-  diffConfigs,
-  draftConfig,
-  type FieldValue,
-  getPreset,
-  parseRunConfig,
-} from "@dedupe/core";
+import { CsvError, mapRows, readRows, toSourceRecords } from "@dedupe/cli/csv";
+import { ConfigError, diffConfigs, type FieldValue, getPreset, parseRunConfig } from "@dedupe/core";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { z } from "zod";
 import { endSession, passwordMatches, requireSession, startSession } from "./auth";
 import { readAuthEnv } from "./env";
 import { UserFacingError } from "./errors";
@@ -20,8 +14,11 @@ import { clientIp, createRateLimiter } from "./rateLimit";
 import * as repo from "./repo";
 import {
   currentDataset,
+  datasetRecords,
+  ensureObject,
   type ImpactPreview,
   previewImpact,
+  rerunObject,
   runDataset,
   selectDataset,
 } from "./service";
@@ -73,43 +70,111 @@ export async function logoutAction(): Promise<void> {
   redirect("/login");
 }
 
-export async function uploadDatasetAction(_: FormState, form: FormData): Promise<FormState> {
+/** Step 1 of an import or CRM export: store the file as-is. Columns are mapped in step 2. */
+export async function uploadFileAction(_: FormState, form: FormData): Promise<FormState> {
   await requireSession();
-  const name = String(form.get("name") ?? "").trim();
+  const kind = form.get("kind") === "crm" ? "crm" : "import";
   const preset = getPreset(String(form.get("objectType") ?? ""));
   const file = form.get("file");
-  if (!preset) return { error: "Choose which object this file holds." };
+  const name = String(form.get("name") ?? "").trim() || (file instanceof File ? file.name : "");
+  if (!preset) return { error: "Choose the object this file is for." };
   if (!name || name.length > MAX_NAME_LENGTH)
-    return { error: "Give the object a name (up to 100 characters)." };
+    return { error: "Give it a name (up to 100 characters)." };
   if (!(file instanceof File) || file.size === 0) return { error: "Choose a CSV file." };
   if (file.size > MAX_UPLOAD_BYTES) return { error: "The file is larger than 25 MB." };
+  let datasetId: string;
   try {
-    const parsed = parseCsv(await file.text());
-    const { config } = draftConfig(parsed.fieldColumns, preset.id);
-    const datasetId = await repo.createDataset({
+    const { headers, rows } = readRows(await file.text());
+    if (headers.length === 0 || rows.length === 0) return { error: "The file has no rows." };
+    const uploadedAt = new Date().toISOString();
+    datasetId = await repo.createUpload({
       name,
+      kind,
       entity: preset.entity,
       objectType: preset.id,
-      ...parsed,
-      config,
+      headers,
+      rows: rows.map((cells, i) => ({
+        id: `row-${i + 2}`,
+        createdAt: uploadedAt,
+        updatedAt: uploadedAt,
+        cells,
+      })),
     });
     await repo.logEvent(
-      datasetId,
+      { objectType: preset.id, datasetId },
       "upload",
-      `Uploaded ${parsed.rows.length} ${preset.systemLabel} ${preset.objectLabel} from ${file.name}`,
+      `${kind === "crm" ? "Uploaded CRM export" : "Uploaded import"} "${name}" with ${rows.length} rows`,
     );
     await selectDataset(datasetId);
-    await runDataset(datasetId);
   } catch (error) {
     return { error: friendly(error) };
   }
-  redirect("/rules/setup?welcome=1");
+  redirect(`/imports/${datasetId}/map`);
 }
+
+const mappingSchema = z.object({
+  fields: z.record(z.string(), z.string().trim().min(1).max(MAX_NAME_LENGTH).nullable()),
+  id: z.string().optional(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+});
+
+/** Step 2: apply the column mapping, extend the object's rules with new fields, and run. */
+export async function applyMappingAction(datasetId: string, input: unknown): Promise<FormState> {
+  await requireSession();
+  const dataset = await repo.getDataset(datasetId);
+  if (!dataset) return { error: "That upload no longer exists." };
+  const parsed = mappingSchema.safeParse(input);
+  if (!parsed.success) return { error: "The mapping is incomplete. Check every column." };
+  const mapping = parsed.data;
+  const specials = [mapping.id, mapping.createdAt, mapping.updatedAt].filter((c): c is string =>
+    Boolean(c),
+  );
+  if (specials.some((c) => !dataset.headers.includes(c)))
+    return { error: "Pick columns that exist in the file." };
+  if (dataset.kind === "crm" && !mapping.id) {
+    return {
+      error: "A CRM export needs its record ID column, so updates can point at the right record.",
+    };
+  }
+  try {
+    const raw = await repo.getRecords(datasetId);
+    const records = mapRows(
+      dataset.headers,
+      raw.map((r) => r.cells),
+      mapping,
+      dataset.createdAt.toISOString(),
+    );
+    const fieldColumns = [...new Set(records.flatMap((r) => Object.keys(r.cells)))];
+    await repo.applyMapping(datasetId, mapping, fieldColumns, records);
+    const added = await ensureObject(dataset.objectType, fieldColumns);
+    if (added.length > 0) {
+      await repo.logEvent(
+        { objectType: dataset.objectType },
+        "rules",
+        `Suggested rules for ${added.length} new field(s)`,
+        { changes: added.map((f) => `${f}: added with a suggested rule`) },
+      );
+    }
+    if (dataset.kind === "crm") {
+      await repo.deleteOtherSnapshots(dataset.objectType, datasetId);
+      await rerunObject(dataset.objectType);
+    } else {
+      await runDataset(datasetId);
+    }
+  } catch (error) {
+    return { error: friendly(error) };
+  }
+  redirect(dataset.kind === "crm" ? "/crm" : `/imports/${datasetId}`);
+}
+
+const SAFE_NEXT = /^\/[a-z/-]*$/;
 
 export async function selectDatasetAction(form: FormData): Promise<void> {
   await requireSession();
   await selectDataset(String(form.get("id") ?? ""));
-  redirect("/");
+  const next = String(form.get("next") ?? "/");
+  redirect(SAFE_NEXT.test(next) ? next : "/");
 }
 
 export async function deleteDatasetAction(form: FormData): Promise<void> {
@@ -138,31 +203,32 @@ export async function previewConfigAction(
   const dataset = await currentDataset();
   if (!dataset) return { error: "Upload a dataset first." };
   try {
-    return { preview: await previewImpact(dataset.id, parseRunConfig(input)) };
+    return { preview: await previewImpact(dataset, parseRunConfig(input)) };
   } catch (error) {
     return { error: friendly(error) };
   }
 }
 
+/** Rules belong to the object: saving re-runs its CRM data and every import into it. */
 export async function saveConfigAction(input: unknown): Promise<FormState> {
   await requireSession();
   const dataset = await currentDataset();
-  if (!dataset) return { error: "Upload a dataset first." };
+  if (!dataset) return { error: "Add CRM data or an import first." };
   try {
     const next = parseRunConfig(input);
-    const [previous, counts] = await Promise.all([
-      repo.getConfig(dataset.id),
-      repo.countEvents(dataset.id),
+    const [object, counts] = await Promise.all([
+      repo.getObject(dataset.objectType),
+      repo.countEvents(dataset.objectType),
     ]);
-    const changes = previous ? diffConfigs(previous, next) : [];
-    await repo.saveConfig(dataset.id, next);
+    const changes = object ? diffConfigs(object.config, next) : [];
+    await repo.saveObject(dataset.objectType, next, object?.fields ?? dataset.fieldColumns);
     await repo.logEvent(
-      dataset.id,
+      { objectType: dataset.objectType },
       "rules",
       `Rules v${counts.rules + 1} went live${changes.length ? ` with ${changes.length} change(s)` : ""}`,
       { changes, config: next },
     );
-    await runDataset(dataset.id);
+    await rerunObject(dataset.objectType);
   } catch (error) {
     return { error: friendly(error) };
   }
@@ -192,7 +258,11 @@ export async function decideAction(identityId: string, decision: Decision): Prom
       rejected: "Marked not duplicates:",
       pending: "Reopened",
     }[decision];
-    await repo.logEvent(dataset.id, "decision", `${verb} ${identity.sourceIds.join(" + ")}`);
+    await repo.logEvent(
+      { objectType: dataset.objectType, datasetId: dataset.id },
+      "decision",
+      `${verb} ${identity.sourceIds.join(" + ")}`,
+    );
   }
   revalidatePath("/", "layout");
 }
@@ -228,17 +298,17 @@ export async function saveExampleAction(identityId: string, name: string): Promi
   const [identity, config, raw] = await Promise.all([
     repo.getIdentity(runId, identityId),
     dataset ? repo.getConfig(dataset.id) : null,
-    dataset ? repo.getRecords(dataset.id) : [],
+    dataset ? datasetRecords(dataset) : [],
   ]);
   if (!dataset || !identity || !config) return { error: "Could not find that group." };
   const members = raw.filter((r) => identity.sourceIds.includes(r.id));
-  await repo.createExample(dataset.id, {
+  await repo.createExample(dataset.objectType, {
     name: name.trim().slice(0, MAX_NAME_LENGTH) || `Group ${identity.keepRecordId}`,
     records: toSourceRecords(members, config.policy),
     expected: { ...applyOverrides(identity.golden, identity.overrides).values },
   });
   await repo.logEvent(
-    dataset.id,
+    { objectType: dataset.objectType },
     "example",
     `Saved example "${name.trim() || identity.keepRecordId}"`,
   );

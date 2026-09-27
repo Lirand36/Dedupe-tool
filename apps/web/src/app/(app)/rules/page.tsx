@@ -7,7 +7,7 @@ import { RulesTable } from "@/components/rules/RulesTable";
 import { PageHeader, SectionTitle, Tabs } from "@/components/ui";
 import { deleteExampleAction } from "@/lib/actions";
 import { objectLabel } from "@/lib/objects";
-import { countEvents, getConfig, listExamples } from "@/lib/repo";
+import { countEvents, getObject, listExamples } from "@/lib/repo";
 import { currentDataset } from "@/lib/service";
 
 const VIEWS = ["summary", "table", "graph"] as const;
@@ -30,15 +30,18 @@ export default async function RulesPage({
       />
     );
   }
-  const [config, examples, counts] = await Promise.all([
-    getConfig(dataset.id),
-    listExamples(dataset.id),
-    countEvents(dataset.id),
+  const [object, examples, counts] = await Promise.all([
+    getObject(dataset.objectType),
+    listExamples(dataset.objectType),
+    countEvents(dataset.objectType),
   ]);
-  if (!config)
+  const config = object?.config;
+  const columns = object?.fields ?? dataset.fieldColumns;
+  if (!config) {
     return (
-      <EmptyState title="No rules yet" body="Re-add the object to generate a starting point." />
+      <EmptyState title="No rules yet" body="Map an upload for this object to generate rules." />
     );
+  }
   const view: View = VIEWS.includes(params.view as View) ? (params.view as View) : "summary";
   const version =
     counts.rules > 0 ? `Rules v${counts.rules} · live` : "Suggested rules · not reviewed yet";
@@ -68,8 +71,8 @@ export default async function RulesPage({
           { key: "graph", label: "Graph", href: "/rules?view=graph" },
         ]}
       />
-      {view === "summary" && <RulesSummary config={config} columns={dataset.fieldColumns} />}
-      {view === "table" && <RulesTable config={config} columns={dataset.fieldColumns} />}
+      {view === "summary" && <RulesSummary config={config} columns={columns} />}
+      {view === "table" && <RulesTable config={config} columns={columns} />}
       {view === "graph" && (
         <section className="card p-6">
           <SectionTitle

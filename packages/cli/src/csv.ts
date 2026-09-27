@@ -153,3 +153,68 @@ export function identitiesToCsv(result: RunResult, policy: Policy): string {
   ]);
   return stringify([header, ...rows].map((row) => row.map(safeCell)));
 }
+
+export interface RowMapping {
+  /** File column → object field, or null to skip. Columns not listed keep their own name. */
+  readonly fields: Readonly<Record<string, string | null>>;
+  readonly id?: string | undefined;
+  readonly createdAt?: string | undefined;
+  readonly updatedAt?: string | undefined;
+}
+
+/** Line number in the file for the n-th data row (the header is line 1). */
+const lineOf = (index: number) => index + 2;
+
+function optionalDate(
+  value: string,
+  column: string | undefined,
+  line: number,
+  fallback: string,
+): string {
+  if (!column || value === "") return fallback;
+  return checkDate(value, column, line);
+}
+
+/**
+ * Turns raw file rows into records for an object: renames and skips columns, and fills a row id
+ * and dates when the file has none (row number, upload time), so any list can be imported.
+ */
+export function mapRows(
+  headers: readonly string[],
+  rows: readonly Readonly<Record<string, string>>[],
+  mapping: RowMapping,
+  uploadedAt: string,
+): RawRecord[] {
+  const specials = new Set([mapping.id, mapping.createdAt, mapping.updatedAt].filter(Boolean));
+  const columns = headers
+    .filter((h) => !specials.has(h))
+    .flatMap((h) => {
+      const target = h in mapping.fields ? mapping.fields[h] : h;
+      return target ? [[h, target] as const] : [];
+    });
+  const seen = new Set<string>();
+  return rows.map((row, index) => {
+    const line = lineOf(index);
+    const id = (mapping.id ? (row[mapping.id] ?? "").trim() : "") || `row-${line}`;
+    if (seen.has(id)) throw new CsvError(`Row ${line}: duplicate id "${id}"`);
+    seen.add(id);
+    const createdAt = optionalDate(
+      (row[mapping.createdAt ?? ""] ?? "").trim(),
+      mapping.createdAt,
+      line,
+      uploadedAt,
+    );
+    const updatedAt = optionalDate(
+      (row[mapping.updatedAt ?? ""] ?? "").trim(),
+      mapping.updatedAt,
+      line,
+      createdAt,
+    );
+    return {
+      id,
+      createdAt,
+      updatedAt,
+      cells: Object.fromEntries(columns.map(([h, t]) => [t, row[h] ?? ""])),
+    };
+  });
+}

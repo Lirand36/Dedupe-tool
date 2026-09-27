@@ -105,7 +105,16 @@ export function InboxDetail(props: Props) {
               <th className="px-4 py-2 font-medium">Field</th>
               {recordIds.map((id) => (
                 <th key={id} className="px-4 py-2 font-medium">
-                  {id}
+                  {id.startsWith("crm:") ? (
+                    <span className="normal-case">
+                      <span className="mr-1 rounded bg-sky-100 px-1.5 py-0.5 text-[10px] text-sky-700">
+                        In CRM
+                      </span>
+                      {id.slice(4)}
+                    </span>
+                  ) : (
+                    id
+                  )}
                   {id === keepRecordId && (
                     <span className="ml-1 normal-case text-accent">(kept)</span>
                   )}

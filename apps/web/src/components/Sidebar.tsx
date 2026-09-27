@@ -1,15 +1,16 @@
 "use client";
 
-import { Database, GitMerge, History, Inbox, LayoutDashboard, LogOut } from "lucide-react";
+import { Cloud, FileUp, GitMerge, History, Inbox, LayoutDashboard, LogOut } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { logoutAction } from "@/lib/actions";
 
 const LINKS = [
   { href: "/", label: "Overview", icon: LayoutDashboard },
+  { href: "/crm", label: "CRM", icon: Cloud },
+  { href: "/imports", label: "Imports", icon: FileUp },
   { href: "/inbox", label: "Review", icon: Inbox },
   { href: "/rules", label: "Rules", icon: GitMerge },
-  { href: "/objects", label: "Objects", icon: Database },
   { href: "/history", label: "History", icon: History },
 ] as const;
 

@@ -24,8 +24,8 @@ export function ObjectSwitcher({
   const current = options.find((o) => o.id === currentId);
   if (!current) {
     return (
-      <Link href="/objects" className="btn-ghost">
-        <Plus size={16} aria-hidden /> Add your first object
+      <Link href="/crm" className="btn-ghost">
+        <Plus size={16} aria-hidden /> Add CRM data or an import
       </Link>
     );
   }
@@ -61,7 +61,12 @@ export function ObjectSwitcher({
           className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-muted"
         />
       </div>
-      <Link href="/objects" className="btn-ghost px-2.5" aria-label="Add object" title="Add object">
+      <Link
+        href="/imports/new"
+        className="btn-ghost px-2.5"
+        aria-label="New import"
+        title="New import"
+      >
         <Plus size={16} aria-hidden />
       </Link>
     </form>
