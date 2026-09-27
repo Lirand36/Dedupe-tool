@@ -38,8 +38,8 @@ Settings holds connections and field mapping. Lead-to-account matching and norma
 |---|---|---|
 | 0 | Foundations: repo, CI, lint, tests | done |
 | 1 | Engine: tags, candidate slots, clean records with reasons, matching, examples, config validation, CSV CLI | done (v0.1) |
-| 2 | Web UI v1 on CSV: import, tag fields (with suggestions), Inbox, change preview, export. Postgres + auth. | next |
-| 3 | Salesforce: OAuth, background sync, loading existing history, write-back + merge, tiers, undo snapshots, schedules | |
+| 2 | Web UI v1 on CSV: import, tag fields (with suggestions), Inbox, change preview, export. Postgres + auth. Render deploy. | done (v0.2) |
+| 3 | Salesforce: OAuth, background sync, loading existing history, write-back + merge, tiers, undo snapshots, schedules | next |
 | 4 | HubSpot + warehouse sources | |
 | 5 | Lead-to-account matching, normalization jobs, Lead↔Contact cross-object dedupe | |
 | 6 | Health dashboard, Slack digest, alerts | |

@@ -1,0 +1,28 @@
+# Render Blueprint: New → Blueprint → pick this repo. Creates the web app and its database.
+services:
+  - type: web
+    name: dedupe-tool
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    healthCheckPath: /login
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: dedupe-db
+          property: connectionString
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: ADMIN_PASSWORD
+        sync: false # Render asks you for it when you create the Blueprint
+
+databases:
+  - name: dedupe-db
+    plan: free
+    databaseName: dedupe
+    user: dedupe
+    ipAllowList: [] # no public access; only the web app connects

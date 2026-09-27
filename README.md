@@ -45,11 +45,35 @@ CSV files need `id`, `createdAt`, `updatedAt` columns. Multi-value cells use `;`
 - `keep_record_id` and `remove_record_ids`
 - every clean value, plus a `<field>__why` column
 
+## The web app
+
+A single-admin web app with four screens:
+- **Health**: duplicate rate, what's ready, what needs you, emptiest fields, run history.
+- **Inbox**: only the groups that need a person. Records side by side with the clean record and a reason per value. Click any value to use it instead, approve or reject, or save a group as an example.
+- **Logic**: channels, one tag per field (pre-filled), matching settings, and **Preview impact** before **Save and re-run**. Decisions on unchanged groups are kept.
+- **Data**: upload CSV exports. Download the clean CSV from Health.
+
+Run it locally (it uses an embedded Postgres, so nothing to install):
+
+```bash
+cp apps/web/.env.example apps/web/.env.local   # set ADMIN_PASSWORD and SESSION_SECRET
+npm run dev:web                                # http://localhost:3000
+```
+
+### Deploy on Render
+
+`render.yaml` is a Render Blueprint:
+1. In Render, click **New → Blueprint** and pick this repo.
+2. When asked, enter `ADMIN_PASSWORD` (12+ characters).
+
+Render creates the web service and a Postgres database, generates `SESSION_SECRET`, and redeploys on every push to `main`.
+
 ## Repo layout
 
 ```
 packages/core   Pure engine: normalize, match, group, candidate slots, clean records, examples-as-tests
 packages/cli    CSV in, clean CSV out; drafts a config from CSV headers
+apps/web        Next.js app: login, Health, Inbox, Logic, Data; Postgres via plain SQL
 docs/PLAN.md    Product plan and roadmap
 docs/adr/       Architecture decisions
 ```

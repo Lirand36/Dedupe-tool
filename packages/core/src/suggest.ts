@@ -12,8 +12,13 @@ interface NameRule {
   readonly why: string;
 }
 
-/** Ordered: the first matching rule wins, so "First_Last_Touch" is treated as origin. */
+/** Ordered: the first matching rule wins, so "First Name" is identity and "First_Last_Touch" is origin. */
 const NAME_RULES: readonly NameRule[] = [
+  {
+    pattern: /^(first|last)_?name$/,
+    tag: { kind: "current" },
+    why: "Identity field: keep the latest spelling",
+  },
   {
     pattern: /(^|_)(first|original|orig|initial)(_|$)/,
     tag: { kind: "origin" },

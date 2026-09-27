@@ -17,6 +17,14 @@ describe("suggestTag", () => {
     expect(suggestTag(field).tag.kind).toBe(kind);
   });
 
+  it.each(["firstName", "First Name", "last_name", "LastName__c"])(
+    "treats %s as a current identity field, not origin/latest",
+    (field) => {
+      expect(suggestTag(field)).toMatchObject({ tag: { kind: "current" }, confidence: "high" });
+      expect(suggestTag(field).why).toMatch(/identity/i);
+    },
+  );
+
   it("marks name-based guesses as high confidence and defaults as low", () => {
     expect(suggestTag("First_Touch_Date").confidence).toBe("high");
     expect(suggestTag("Industry")).toMatchObject({ tag: { kind: "current" }, confidence: "low" });

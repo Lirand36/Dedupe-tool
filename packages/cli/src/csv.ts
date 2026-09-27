@@ -51,32 +51,68 @@ function checkDate(value: string | undefined, column: string, line: number): str
   return value;
 }
 
-/** Turns CSV text into source records. Fails fast on missing columns or bad dates. */
-export function recordsFromCsv(text: string, policy: Policy, system = "csv"): SourceRecord[] {
+/** A validated CSV row: system columns pulled out, every other cell kept as text. */
+export interface RawRecord {
+  readonly id: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly cells: Readonly<Record<string, string>>;
+}
+
+export interface ParsedCsv {
+  readonly fieldColumns: readonly string[];
+  readonly rows: readonly RawRecord[];
+}
+
+/** Parses and validates CSV text. Fails fast on missing columns, empty or duplicate ids, bad dates. */
+export function parseCsv(text: string): ParsedCsv {
   const { headers, rows } = readRows(text);
   const missing = [...RESERVED_COLUMNS].filter((c) => !headers.includes(c));
   if (missing.length > 0) throw new CsvError(`Missing required column(s): ${missing.join(", ")}`);
+  const fieldColumns = headers.filter((h) => !RESERVED_COLUMNS.has(h));
   const seen = new Set<string>();
-  return rows.map((row, index) => {
+  const raw = rows.map((row, index) => {
     const line = index + 2;
     const id = row[ID_COLUMN] ?? "";
     if (id === "") throw new CsvError(`Row ${line}: "${ID_COLUMN}" is empty`);
     if (seen.has(id)) throw new CsvError(`Row ${line}: duplicate id "${id}"`);
     seen.add(id);
-    const fields = headers
-      .filter((h) => !RESERVED_COLUMNS.has(h))
-      .map((h) => [h, cellValue(row[h] ?? "", policy.fields[h]?.kind === "combine")] as const);
     return {
       id,
-      system,
       createdAt: checkDate(row[CREATED_AT_COLUMN], CREATED_AT_COLUMN, line),
       updatedAt: checkDate(row[UPDATED_AT_COLUMN], UPDATED_AT_COLUMN, line),
-      fields: Object.fromEntries(fields),
+      cells: Object.fromEntries(fieldColumns.map((h) => [h, row[h] ?? ""])),
     };
   });
+  return { fieldColumns, rows: raw };
 }
 
-function cellText(value: FieldValue | undefined): string {
+/** Applies the policy's view of each cell: blanks become null, "combine" cells become lists. */
+export function toSourceRecords(
+  rows: readonly RawRecord[],
+  policy: Policy,
+  system = "csv",
+): SourceRecord[] {
+  return rows.map((row) => ({
+    id: row.id,
+    system,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    fields: Object.fromEntries(
+      Object.entries(row.cells).map(([h, v]) => [
+        h,
+        cellValue(v, policy.fields[h]?.kind === "combine"),
+      ]),
+    ),
+  }));
+}
+
+/** Turns CSV text into source records. */
+export function recordsFromCsv(text: string, policy: Policy, system = "csv"): SourceRecord[] {
+  return toSourceRecords(parseCsv(text).rows, policy, system);
+}
+
+export function cellText(value: FieldValue | undefined): string {
   if (value === undefined || value === null) return "";
   return Array.isArray(value) ? value.join(`${LIST_SEPARATOR} `) : String(value);
 }
