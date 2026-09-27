@@ -50,7 +50,7 @@ export async function saveObject(
   fields: readonly string[],
 ): Promise<void> {
   await (await getDb()).query(
-    `INSERT INTO objects (object_type, config, fields) VALUES ($1, $2::jsonb, $3::jsonb)
+    `INSERT INTO objects (object_type, config, fields) VALUES ($1, $2::text::jsonb, $3::text::jsonb)
      ON CONFLICT (object_type) DO UPDATE SET config = EXCLUDED.config, fields = EXCLUDED.fields, updated_at = now()`,
     [objectType, json(config), json(fields)],
   );
@@ -78,7 +78,7 @@ export async function createExample(
   example: { name: string; records: readonly SourceRecord[]; expected: Record<string, FieldValue> },
 ): Promise<void> {
   await (await getDb()).query(
-    "INSERT INTO examples (id, object_type, name, records, expected) VALUES ($1, $2, $3, $4::jsonb, $5::jsonb)",
+    "INSERT INTO examples (id, object_type, name, records, expected) VALUES ($1, $2, $3, $4::text::jsonb, $5::text::jsonb)",
     [randomUUID(), objectType, example.name, json(example.records), json(example.expected)],
   );
 }
@@ -117,7 +117,7 @@ export async function logEvent(
 ): Promise<void> {
   await (await getDb()).query(
     `INSERT INTO events (id, object_type, dataset_id, kind, summary, detail)
-     VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
+     VALUES ($1, $2, $3, $4, $5, $6::text::jsonb)`,
     [randomUUID(), target.objectType, target.datasetId ?? null, kind, summary, json(detail)],
   );
 }
@@ -146,8 +146,8 @@ export async function countEvents(objectType: string): Promise<Record<EventKind,
 }
 
 export async function saveSchedule(objectType: string, schedule: MergeSchedule): Promise<void> {
-  await (await getDb()).query("UPDATE objects SET schedule = $2::jsonb WHERE object_type = $1", [
-    objectType,
-    json(schedule),
-  ]);
+  await (await getDb()).query(
+    "UPDATE objects SET schedule = $2::text::jsonb WHERE object_type = $1",
+    [objectType, json(schedule)],
+  );
 }

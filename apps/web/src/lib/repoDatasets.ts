@@ -58,7 +58,7 @@ async function insertRecords(datasetId: string, rows: readonly RawRecord[]): Pro
   for (const chunk of chunks(rows, INSERT_CHUNK)) {
     await db.query(
       `INSERT INTO dataset_records (dataset_id, id, created_at, updated_at, cells)
-       SELECT $1, r->>'id', r->>'createdAt', r->>'updatedAt', r->'cells' FROM jsonb_array_elements($2::jsonb) r`,
+       SELECT $1, r->>'id', r->>'createdAt', r->>'updatedAt', r->'cells' FROM jsonb_array_elements($2::text::jsonb) r`,
       [datasetId, json(chunk)],
     );
   }
@@ -76,7 +76,7 @@ export async function createUpload(input: {
   const id = randomUUID();
   await (await getDb()).query(
     `INSERT INTO datasets (id, name, kind, status, entity, object_type, headers, field_columns, record_count)
-     VALUES ($1, $2, $3, 'mapping', $4, $5, $6::jsonb, $6::jsonb, $7)`,
+     VALUES ($1, $2, $3, 'mapping', $4, $5, $6::text::jsonb, $6::text::jsonb, $7)`,
     [
       id,
       input.name,
@@ -102,7 +102,7 @@ export async function applyMapping(
   await db.query("DELETE FROM dataset_records WHERE dataset_id = $1", [datasetId]);
   await insertRecords(datasetId, rows);
   await db.query(
-    `UPDATE datasets SET status = 'ready', column_map = $2::jsonb, field_columns = $3::jsonb, record_count = $4
+    `UPDATE datasets SET status = 'ready', column_map = $2::text::jsonb, field_columns = $3::text::jsonb, record_count = $4
      WHERE id = $1`,
     [datasetId, json(columnMap), json(fieldColumns), rows.length],
   );

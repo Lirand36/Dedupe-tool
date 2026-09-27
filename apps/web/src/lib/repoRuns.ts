@@ -30,7 +30,7 @@ export async function createRun(
   const db = await getDb();
   const id = randomUUID();
   await db.query(
-    "INSERT INTO runs (id, dataset_id, stats, config) VALUES ($1, $2, $3::jsonb, $4::jsonb)",
+    "INSERT INTO runs (id, dataset_id, stats, config) VALUES ($1, $2, $3::text::jsonb, $4::text::jsonb)",
     [id, datasetId, json(result.stats), json(config)],
   );
   for (const chunk of chunks(result.identities, INSERT_CHUNK)) {
@@ -38,7 +38,7 @@ export async function createRun(
       `INSERT INTO identities (run_id, id, tier, confidence, keep_record_id, remove_record_ids, source_ids, golden, evidence)
        SELECT $1, i->>'id', i->>'tier', (i->>'confidence')::real, i->>'keepRecordId',
               i->'removeRecordIds', i->'sourceIds', i->'golden', i->'evidence'
-       FROM jsonb_array_elements($2::jsonb) i`,
+       FROM jsonb_array_elements($2::text::jsonb) i`,
       [id, json(chunk)],
     );
   }
@@ -136,7 +136,7 @@ export async function setOverride(
   const sql =
     value === null
       ? "UPDATE identities SET overrides = overrides - $3::text WHERE run_id = $1 AND id = $2"
-      : "UPDATE identities SET overrides = overrides || jsonb_build_object($3::text, $4::jsonb) WHERE run_id = $1 AND id = $2";
+      : "UPDATE identities SET overrides = overrides || jsonb_build_object($3::text, $4::text::jsonb) WHERE run_id = $1 AND id = $2";
   await db.query(sql, value === null ? [runId, id, field] : [runId, id, field, json(value)]);
 }
 
